@@ -1,0 +1,94 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import http from 'node:http';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const input = { title: 'HTTP integration fixture', goal: 'reject invalid input', repo: '/test/repo', baseline: 'abc', scope: 'login', criteria: 'tests pass', implementer: 'A', reviewer: 'B' };
+async function start(dir) {
+ const child = spawn(process.execPath, ['server.mjs'], { env: { ...process.env, PORT: '0', AGENTSUMMARY_DATA_DIR: dir }, stdio: ['ignore', 'pipe', 'pipe'] });
+ const url = await new Promise((resolve, reject) => { let output = ''; const timer = setTimeout(() => { child.kill(); reject(Error('server startup timed out')); }, 5000); child.stdout.on('data', chunk => { output += chunk; const m = output.match(/http:\/\/127\.0\.0\.1:\d+/); if (m) { clearTimeout(timer); resolve(m[0]); } }); child.on('error', e => { clearTimeout(timer); reject(e); }); child.on('exit', code => { clearTimeout(timer); reject(Error(`server exited ${code}`)); }); });
+ return { child, url };
+}
+async function stop(child) { if (child.exitCode !== null) return; await new Promise(resolve => { child.once('exit', resolve); child.kill(); }); }
+test('HTTP validation, persistence across restart, exports and cross-origin isolation', async () => {
+ const dir = mkdtempSync(join(tmpdir(), 'agentsummary-test-')); let service;
+ try {
+  service = await start(dir);
+  const request = (path, body) => fetch(service.url + '/api/projects' + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
+  assert.equal((await request('', {})).status, 400);
+  let response = await request('', input); assert.equal(response.status, 200); const p = await response.json();
+  assert.equal((await request('/' + p.id, { action: 'accept', note: 'premature' })).status, 400);
+  assert.equal((await request('/' + p.id)).status, 200);
+  assert.match((await (await request('/' + p.id + '/pack')).json()).text, /reject invalid input/);
+  assert.equal((await request('/' + p.id + '/delivery')).status, 400);
+  const badOrigin = await fetch(service.url + '/api/projects', { method: 'POST', headers: { origin: 'https://untrusted.example', 'content-type': 'application/json' }, body: JSON.stringify(input) }); assert.equal(badOrigin.status, 403);
+  const badHost = await new Promise((resolve, reject) => { http.get(service.url + '/api/projects', { headers: { host: 'untrusted.example' } }, response => { response.resume(); resolve(response.statusCode); }).on('error', reject); }); assert.equal(badHost, 403);
+  await stop(service.child); service = await start(dir);
+  const restored = await (await request('/' + p.id)).json(); assert.equal(restored.title, input.title); assert.equal(restored.history.length, 1);
+  await request('/' + p.id, { action: 'dispatch' });
+  assert.equal((await request('/' + p.id, { action: 'result', summary: 'missing materials' })).status, 400);
+  const unchanged = await (await request('/' + p.id)).json(); assert.equal(unchanged.status, 'running'); assert.equal(unchanged.runs.length, 0);
+  assert.equal((await fetch(service.url + '/../../domain.mjs')).status, 404);
+  for (const path of ['/review-policy.js', '/review-export.js']) assert.equal((await fetch(service.url + path)).status, 200);
+  await request('/' + p.id, { action: 'result', summary: 'fixed', artifact: 'actual diff', version: 'bundle-v1', evidence: 'log', tests: 'passed', issues: 'none', next: 'review' });
+  const bundleEndpoint = '/' + p.id + '/review-bundle';
+  assert.equal((await request(bundleEndpoint, { files: [{ path: 'data/projects.json', content: 'FORBIDDEN' }], confirmVersion: 'bundle-v1' })).status, 400);
+  assert.equal((await request(bundleEndpoint, { files: [{ path: 'server.mjs', content: 'hello' }] })).status, 400);
+  const bundleResponse = await request(bundleEndpoint, { files: [{ path: 'server.mjs', content: 'selected source' }], confirmVersion: 'bundle-v1' });
+  assert.equal(bundleResponse.status, 200);
+  const bundle = await bundleResponse.json();
+  assert.deepEqual(bundle.manifest.map(f => f.path), ['server.mjs']);
+  assert.ok(bundle.text.includes('selected source'));
+  const afterExport = await (await request('/' + p.id)).json();
+  assert.equal(afterExport.stage, 'review'); assert.equal(afterExport.status, 'ready');
+  assert.ok(!JSON.stringify(afterExport).includes('selected source'));
+  await stop(service.child); service = await start(dir);
+  const afterRestart = await (await request('/' + p.id)).json();
+  assert.ok(!JSON.stringify(afterRestart).includes('selected source'));
+ } finally { if (service) await stop(service.child); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('UTF-8 characters split across request chunks survive saving and handoff', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agentsummary-utf8-'));
+  let service;
+  try {
+    service = await start(dir);
+    const title = '修复中文标题与 emoji 🧪';
+    const payload = Buffer.from(JSON.stringify({ ...input, title }));
+    // Split inside both a three-byte Chinese character and a four-byte emoji.
+    const chineseSplit = payload.indexOf(Buffer.from('修')) + 1;
+    const emojiSplit = payload.indexOf(Buffer.from('🧪')) + 2;
+    const response = await new Promise((resolve, reject) => {
+      const request = http.request(service.url + '/api/projects', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+      }, result => {
+        const chunks = [];
+        result.on('data', chunk => chunks.push(chunk));
+        result.on('error', reject);
+        result.on('end', () => resolve({ status: result.statusCode, data: JSON.parse(Buffer.concat(chunks).toString('utf8')) }));
+      });
+      request.on('error', reject);
+      request.flushHeaders();
+      request.write(payload.subarray(0, chineseSplit));
+      // Separate network writes so the server receives partial UTF-8 sequences.
+      setTimeout(() => {
+        request.write(payload.subarray(chineseSplit, emojiSplit));
+        setTimeout(() => request.end(payload.subarray(emojiSplit)), 30);
+      }, 30);
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.data.title, title);
+    await stop(service.child);
+    service = await start(dir);
+    const restored = await (await fetch(service.url + '/api/projects/' + response.data.id)).json();
+    assert.equal(restored.title, title);
+    const pack = await (await fetch(service.url + '/api/projects/' + response.data.id + '/pack')).json();
+    assert.ok(pack.text.includes(title));
+  } finally {
+    if (service) await stop(service.child);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

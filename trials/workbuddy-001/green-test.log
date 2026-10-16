@@ -1,0 +1,26 @@
+
+> agentsummary@0.1.0 test
+> node --test
+
+✔ full handoff, independent review and explicit user acceptance (1.727333ms)
+✔ missing evidence cannot advance implementation (0.128916ms)
+✔ review of a different version is rejected (0.408125ms)
+✔ review rejection preserves previous records and starts new implementation (0.21175ms)
+✔ requirement revision invalidates old evidence and memory (0.174041ms)
+✔ blocking and resuming preserves the current step (0.080916ms)
+✔ user rejection opens a new cycle and is included in next handoff (0.084708ms)
+✔ cancellation preserves audit and prevents further execution (0.05025ms)
+✔ rework handoff includes actual prior change and preserves dispatched input (0.085583ms)
+✔ new requirements retain history without importing obsolete review instructions (0.120875ms)
+✔ new revision clears previous acceptance (0.082ms)
+✔ memory records the evidence version explicitly (0.043625ms)
+✔ HTTP validation, persistence across restart, exports and cross-origin isolation (124.867ms)
+✔ UTF-8 characters split across request chunks survive saving and handoff (151.679958ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 328.35425

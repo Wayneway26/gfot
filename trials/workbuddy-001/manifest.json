@@ -1,0 +1,7 @@
+{
+  "version": "utf8-fc451ae0938f",
+  "sha256": {
+    "server.mjs": "ab9e76296cdb249b156914f5b9d221f9d0085b5da3e6e82786abed5765740e73",
+    "test/server.test.mjs": "8cae77685872ee7cfd5d3d99fcc59c852d5be59b3ec978ee2d3f1c2b7ecea7ce"
+  }
+}

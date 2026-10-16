@@ -1,0 +1,194 @@
+=== isolation-boundaries: PASS ===
+{"sourceReadable":true,"sourceWriteDenied":true,"rootWriteDenied":true,"hostDataUnreadable":true,"dockerSocketAbsent":true,"externalNetworkDenied":true}
+
+=== syntax-check: PASS ===
+
+> agentsummary@0.1.0 check
+> node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js && node --check review-snapshot.mjs && node --check scripts/isolated-check.mjs
+
+
+=== test-suite: PASS ===
+
+> agentsummary@0.1.0 test
+> node --test
+
+TAP version 13
+# Subtest: full handoff, independent review and explicit user acceptance
+ok 1 - full handoff, independent review and explicit user acceptance
+  ---
+  duration_ms: 1.209958
+  type: 'test'
+  ...
+# Subtest: missing evidence cannot advance implementation
+ok 2 - missing evidence cannot advance implementation
+  ---
+  duration_ms: 0.224167
+  type: 'test'
+  ...
+# Subtest: review of a different version is rejected
+ok 3 - review of a different version is rejected
+  ---
+  duration_ms: 0.27175
+  type: 'test'
+  ...
+# Subtest: review rejection preserves previous records and starts new implementation
+ok 4 - review rejection preserves previous records and starts new implementation
+  ---
+  duration_ms: 0.203292
+  type: 'test'
+  ...
+# Subtest: requirement revision invalidates old evidence and memory
+ok 5 - requirement revision invalidates old evidence and memory
+  ---
+  duration_ms: 0.127792
+  type: 'test'
+  ...
+# Subtest: blocking and resuming preserves the current step
+ok 6 - blocking and resuming preserves the current step
+  ---
+  duration_ms: 0.071708
+  type: 'test'
+  ...
+# Subtest: user rejection opens a new cycle and is included in next handoff
+ok 7 - user rejection opens a new cycle and is included in next handoff
+  ---
+  duration_ms: 0.123583
+  type: 'test'
+  ...
+# Subtest: cancellation preserves audit and prevents further execution
+ok 8 - cancellation preserves audit and prevents further execution
+  ---
+  duration_ms: 0.103292
+  type: 'test'
+  ...
+# Subtest: rework handoff includes actual prior change and preserves dispatched input
+ok 9 - rework handoff includes actual prior change and preserves dispatched input
+  ---
+  duration_ms: 0.60675
+  type: 'test'
+  ...
+# Subtest: new requirements retain history without importing obsolete review instructions
+ok 10 - new requirements retain history without importing obsolete review instructions
+  ---
+  duration_ms: 0.263041
+  type: 'test'
+  ...
+# Subtest: new revision clears previous acceptance
+ok 11 - new revision clears previous acceptance
+  ---
+  duration_ms: 0.112666
+  type: 'test'
+  ...
+# Subtest: memory records the evidence version explicitly
+ok 12 - memory records the evidence version explicitly
+  ---
+  duration_ms: 0.046917
+  type: 'test'
+  ...
+# Subtest: bundle covers all selected bytes with hashes and contains no repo path or session history
+ok 13 - bundle covers all selected bytes with hashes and contains no repo path or session history
+  ---
+  duration_ms: 1.523042
+  type: 'test'
+  ...
+# Subtest: filesystem escapes, hidden paths, data and credential files are rejected
+ok 14 - filesystem escapes, hidden paths, data and credential files are rejected
+  ---
+  duration_ms: 0.831667
+  type: 'test'
+  ...
+# Subtest: unselected files cannot enter a bundle and an arbitrary path never causes a disk read
+ok 15 - unselected files cannot enter a bundle and an arbitrary path never causes a disk read
+  ---
+  duration_ms: 0.374917
+  type: 'test'
+  ...
+# Subtest: reject invalid payloads, duplicate paths, binary contents and oversized selections
+ok 16 - reject invalid payloads, duplicate paths, binary contents and oversized selections
+  ---
+  duration_ms: 1.555291
+  type: 'test'
+  ...
+# Subtest: bundle identity changes with input bytes, task or review version; input order is irrelevant
+ok 17 - bundle identity changes with input bytes, task or review version; input order is irrelevant
+  ---
+  duration_ms: 15.63875
+  type: 'test'
+  ...
+# Subtest: cannot export without current implementation or explicit version confirmation
+ok 18 - cannot export without current implementation or explicit version confirmation
+  ---
+  duration_ms: 0.174959
+  type: 'test'
+  ...
+# Subtest: source fence injection cannot break out of the exported code block
+ok 19 - source fence injection cannot break out of the exported code block
+  ---
+  duration_ms: 0.120875
+  type: 'test'
+  ...
+# Subtest: extract exact UTF-8 text including CRLF, empty files and embedded Markdown headings
+ok 20 - extract exact UTF-8 text including CRLF, empty files and embedded Markdown headings
+  ---
+  duration_ms: 5.298125
+  type: 'test'
+  ...
+# Subtest: reject tampered source content and inconsistent manifest before extracting files
+ok 21 - reject tampered source content and inconsistent manifest before extracting files
+  ---
+  duration_ms: 0.342667
+  type: 'test'
+  ...
+# Subtest: reject incomplete bundles and duplicate structural sections
+ok 22 - reject incomplete bundles and duplicate structural sections
+  ---
+  duration_ms: 0.202042
+  type: 'test'
+  ...
+# Subtest: HTTP validation, persistence across restart, exports and cross-origin isolation
+ok 23 - HTTP validation, persistence across restart, exports and cross-origin isolation
+  ---
+  duration_ms: 201.86225
+  type: 'test'
+  ...
+# Subtest: UTF-8 characters split across request chunks survive saving and handoff
+ok 24 - UTF-8 characters split across request chunks survive saving and handoff
+  ---
+  duration_ms: 162.117958
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 516.650709
+
+{
+  "image": "node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402",
+  "files": 15,
+  "network": "none",
+  "snapshot": "read-only",
+  "hostRepositoryMounted": false,
+  "externalDesktopAgentConfined": false,
+  "checks": [
+    {
+      "label": "isolation-boundaries",
+      "ok": true,
+      "exitCode": 0
+    },
+    {
+      "label": "syntax-check",
+      "ok": true,
+      "exitCode": 0
+    },
+    {
+      "label": "test-suite",
+      "ok": true,
+      "exitCode": 0
+    }
+  ]
+}

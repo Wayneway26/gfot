@@ -1,0 +1,82 @@
+{
+  "bundleId": "review-777240ec03c87050",
+  "reviewedVersion": "isolation-9a4a96da427b",
+  "manifest": [
+    {
+      "path": "domain.mjs",
+      "bytes": 10335,
+      "sha256": "9be46063f11b950c70ae1a91cbb40f8b46282fd7a2fe164a065597009f544a7a"
+    },
+    {
+      "path": "package.json",
+      "bytes": 497,
+      "sha256": "5b83c2ab8733b4762d19aaaeabc64a5d80722e8fc7b979cc7ba56babbcb0fe66"
+    },
+    {
+      "path": "public/app.js",
+      "bytes": 21248,
+      "sha256": "cb4a17bf601ac81b21931970af83d83eb73241db50ca35879cd5346565eb5527"
+    },
+    {
+      "path": "public/index.html",
+      "bytes": 1367,
+      "sha256": "d0817333eae8215336715a3b34335b8b1222ba3aa9b835b375945acc9572c596"
+    },
+    {
+      "path": "public/review-export.js",
+      "bytes": 5788,
+      "sha256": "e4fe157b586d4b2a94c6371088a55d8a14ed5c0abd8d0956a53e3bc7f15792c4"
+    },
+    {
+      "path": "public/review-policy.js",
+      "bytes": 1523,
+      "sha256": "4f5f22b8f7ae672ca0b43f7cbc32cd3f7bd7f8c6ed2e74e808cf8ef520c81018"
+    },
+    {
+      "path": "public/style.css",
+      "bytes": 19676,
+      "sha256": "f3e6dbf3d6fe0d0fcdd4b53d729773a329cf34cb8fd60d001850a6c1ccbd08e8"
+    },
+    {
+      "path": "review-bundle.mjs",
+      "bytes": 5030,
+      "sha256": "241d46bf61b99e1b62cbfe6d696b5c0e32b6bb8ada0098bbfc66c0a82a16c194"
+    },
+    {
+      "path": "review-snapshot.mjs",
+      "bytes": 2673,
+      "sha256": "cf8c6761914007c0b23ce285b399084c56e10b98a679b6ac5505040854a9a3d1"
+    },
+    {
+      "path": "scripts/isolated-check.mjs",
+      "bytes": 4911,
+      "sha256": "7b3962c5bee503c8946564cd8fd4b506af79ba08d88ba9708097015aa0c23da0"
+    },
+    {
+      "path": "server.mjs",
+      "bytes": 4493,
+      "sha256": "f5cfa14d3be14aa1559d66856686cca68bbb1fcef9e8b31deb542c27c9fd1111"
+    },
+    {
+      "path": "test/domain.test.mjs",
+      "bytes": 5288,
+      "sha256": "cd3f02171f3aa8db6cf5b0c2dbc6905b56190b478470e9a8b7d528c86bef10b8"
+    },
+    {
+      "path": "test/review-bundle.test.mjs",
+      "bytes": 4278,
+      "sha256": "edb55dfcb799fa1a540e4cfff506e8afb641a18e252891111a7b32b7f361aa17"
+    },
+    {
+      "path": "test/review-snapshot.test.mjs",
+      "bytes": 1736,
+      "sha256": "5da6927c31d1961deec0b24b10b3a835cbcd124c5c47c750bd86d2a273966506"
+    },
+    {
+      "path": "test/server.test.mjs",
+      "bytes": 6784,
+      "sha256": "1c2399016b8289afb47e713a35b1cc9dae90b033f7e0886e8adcf25add72b484"
+    }
+  ],
+  "boundary": "materials-only"
+}

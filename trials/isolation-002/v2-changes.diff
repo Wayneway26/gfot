@@ -1,0 +1,160 @@
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,7 @@
+   "scripts": {
+     "start": "node server.mjs",
+     "test": "node --test",
+-    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js"
++    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js && node --check review-snapshot.mjs && node --check scripts/isolated-check.mjs"
+   },
+   "engines": {
+     "node": ">=22"
+--- a/review-snapshot.mjs
++++ b/review-snapshot.mjs
+@@ -0,0 +1,51 @@
++import { createHash } from 'node:crypto';
++import { fileIssue, MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES } from './public/review-policy.js';
++
++export function extractReviewFiles(text) {
++  const lines = text.split('\n');
++  let manifest = null, inSources = false, manifests = 0, sourceSections = 0;
++  const sources = new Map();
++  function block(start) {
++    const match = lines[start].match(/^(`{3,})(\w*)$/);
++    if (!match) throw Error('Expected fenced review content');
++    const end = lines.indexOf(match[1], start + 1);
++    if (end < 0) throw Error('Unclosed review content');
++    return { text: lines.slice(start + 1, end).join('\n'), end };
++  }
++  function nextBlock(start) {
++    while (start < lines.length && !/^`{3,}/.test(lines[start])) start++;
++    if (start === lines.length) throw Error('Missing review content');
++    return { ...block(start), start };
++  }
++  for (let i = 0; i < lines.length; i++) {
++    if (lines[i] === '## 全部输入文件清单') {
++      manifests++;
++      const data = nextBlock(i + 1); manifest = JSON.parse(data.text); i = data.end;
++    } else if (lines[i] === '## 源码快照') {
++      sourceSections++; inSources = true;
++    } else if (inSources && lines[i].startsWith('### ')) {
++      const path = lines[i].slice(4);
++      if (sources.has(path.toLowerCase())) throw Error('Duplicate source path');
++      const data = nextBlock(i + 1);
++      sources.set(path.toLowerCase(), { path, content: data.text }); i = data.end;
++    } else if (lines[i].startsWith('## ')) {
++      inSources = false;
++    } else if (/^`{3,}/.test(lines[i])) {
++      i = block(i).end;
++    }
++  }
++  if (manifests !== 1 || sourceSections !== 1 || !Array.isArray(manifest) || !manifest.length || manifest.length > MAX_FILES || sources.size !== manifest.length) throw Error('Invalid review manifest');
++  let total = 0;
++  const seen = new Set();
++  return manifest.map(entry => {
++    if (!entry || fileIssue(entry.path) || typeof entry.sha256 !== 'string') throw Error('Forbidden review path');
++    const key = entry.path.toLowerCase();
++    if (seen.has(key)) throw Error('Duplicate manifest path'); seen.add(key);
++    const source = sources.get(key);
++    if (!source || source.path !== entry.path) throw Error('Missing source text');
++    const bytes = Buffer.from(source.content, 'utf8'); total += bytes.length;
++    if (bytes.length > MAX_FILE_BYTES || total > MAX_TOTAL_BYTES || bytes.length !== entry.bytes || bytes.includes(0)) throw Error('Invalid review source size');
++    if (createHash('sha256').update(bytes).digest('hex') !== entry.sha256) throw Error(`Review checksum mismatch: ${entry.path}`);
++    return { path: entry.path, content: source.content };
++  });
++}
+--- a/scripts/isolated-check.mjs
++++ b/scripts/isolated-check.mjs
+@@ -0,0 +1,67 @@
++// Run only the supplied review snapshot. Never mount a repository or the Docker socket.
++import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, realpathSync } from 'node:fs';
++import { join } from 'node:path';
++import { tmpdir } from 'node:os';
++import { spawnSync } from 'node:child_process';
++import { randomUUID } from 'node:crypto';
++import { fileURLToPath } from 'node:url';
++import { extractReviewFiles } from '../review-snapshot.mjs';
++const image = 'node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402';
++const bundlePath = process.argv[2];
++if (!bundlePath) { console.error('Usage: node scripts/isolated-check.mjs path/to/review-copy.md'); process.exit(1); }
++const input = readFileSync(bundlePath);
++if (input.length > 3_000_000) throw Error('Review bundle is too large');
++const files = extractReviewFiles(input.toString('utf8'));
++let endpoint = process.env.DOCKER_HOST;
++if (!endpoint) {
++  const context = spawnSync('docker', ['context', 'inspect'], { encoding: 'utf8', timeout: 15_000 });
++  if (context.status !== 0) throw Error('Local Docker context unavailable');
++  endpoint = JSON.parse(context.stdout)[0]?.Endpoints?.docker?.Host;
++}
++if (typeof endpoint !== 'string' || !endpoint.startsWith('unix:///')) throw Error('Only a local Unix-socket Docker daemon is allowed');
++const docker = (args, options) => spawnSync('docker', ['--host', endpoint, ...args], options);
++const check = docker(['image', 'inspect', image], { encoding: 'utf8', timeout: 15_000 });
++if (check.status !== 0) throw Error('Pinned Docker image unavailable. No host execution fallback. See README.');
++const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'agentsummary-isolated-')));
++const source = join(scratch, 'source'); mkdirSync(source, { mode: 0o755 });
++try {
++  for (const file of files) {
++    const path = join(source, file.path); mkdirSync(join(path, '..'), { recursive: true, mode: 0o755 });
++    writeFileSync(path, file.content, { mode: 0o444, flag: 'wx' });
++  }
++  const results = [];
++  function run(label, command) {
++    const name = 'agentsummary-review-' + randomUUID();
++    try {
++      const result = docker(['run', '--rm', '--name', name, '--pull=never', '--network=none', '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--pids-limit=128', '--memory=512m', '--cpus=1', '--user=1000:1000', '--mount', `type=bind,src=${source},dst=/review,readonly`, '--tmpfs', '/tmp:rw,nosuid,nodev,noexec,size=134217728,uid=1000,gid=1000', '--workdir=/review', '--env=TMPDIR=/tmp', '--env=AGENTSUMMARY_DATA_DIR=/tmp/agentsummary-data', '--env=npm_config_cache=/tmp/npm-cache', image, ...command], { encoding: 'utf8', timeout: 120_000, maxBuffer: 1_000_000 });
++      const ok = result.status === 0 && !result.error;
++      results.push({ label, ok, exitCode: result.status, output: (result.stdout || '') + (result.stderr || ''), error: result.error?.message });
++      console.log(`=== ${label}: ${ok ? 'PASS' : 'FAIL'} ===\n${results.at(-1).output}`);
++      if (!ok) throw Error(`${label} failed. No host execution fallback.`);
++    } finally {
++      // Only this invocation's randomly named container can be removed.
++      docker(['rm', '-f', name], { stdio: 'ignore', timeout: 15_000 });
++    }
++  }
++  const hostDataPath = fileURLToPath(new URL('../data/projects.json', import.meta.url));
++  const probe = `
++    const fs = require('node:fs'), net = require('node:net');
++    const denied = action => { try { action(); return false; } catch { return true; } };
++    const checks = {
++      sourceReadable: fs.readFileSync('/review/package.json', 'utf8').length > 0,
++      sourceWriteDenied: denied(() => fs.writeFileSync('/review/package.json', 'tamper')),
++      rootWriteDenied: denied(() => fs.writeFileSync('/outside-review', 'tamper')),
++      hostDataUnreadable: denied(() => fs.readFileSync(${JSON.stringify(hostDataPath)})),
++      dockerSocketAbsent: !fs.existsSync('/var/run/docker.sock'),
++    };
++    const socket = net.connect({host:'1.1.1.1', port:443});
++    const timer = setTimeout(() => { socket.destroy(); checks.externalNetworkDenied = true; finish(); }, 1000);
++    function finish() { console.log(JSON.stringify(checks)); if (Object.values(checks).some(v => !v)) process.exitCode = 1; }
++    socket.on('connect', () => { clearTimeout(timer); socket.destroy(); checks.externalNetworkDenied = false; finish(); });
++    socket.on('error', () => { clearTimeout(timer); checks.externalNetworkDenied = true; finish(); });
++  `;
++  run('isolation-boundaries', ['node', '-e', probe]);
++  run('syntax-check', ['npm', 'run', 'check']);
++  run('test-suite', ['npm', 'test']);
++  console.log(JSON.stringify({ image, files: files.length, network: 'none', snapshot: 'read-only', hostRepositoryMounted: false, externalDesktopAgentConfined: false, checks: results.map(({label,ok,exitCode}) => ({label,ok,exitCode})) }, null, 2));
++} finally { rmSync(scratch, { recursive: true, force: true }); }
+--- a/test/review-snapshot.test.mjs
++++ b/test/review-snapshot.test.mjs
+@@ -0,0 +1,22 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { buildReviewBundle } from '../review-bundle.mjs';
++import { extractReviewFiles } from '../review-snapshot.mjs';
++const project = { id:'test', revision:1, cycle:1, stage:'review', status:'ready', repo:'/private/repo', title:'review', goal:'review source', scope:'test', constraints:'none', criteria:'pass', runs:[{revision:1,cycle:1,version:'v1',artifact:'diff',summary:'changed',tests:'passed',issues:'none'}] };
++function bundle(files) { return buildReviewBundle(project, {files,confirmVersion:'v1'}).text; }
++test('extract exact UTF-8 text including CRLF, empty files and embedded Markdown headings', () => {
++ const files=[{path:'empty.js',content:''},{path:'source.mjs',content:'// 中文 🧪\r\n```\n## 源码快照\n````\n'}];
++ const actual=extractReviewFiles(bundle(files)); assert.deepEqual(actual, files);
++});
++test('reject tampered source content and inconsistent manifest before extracting files', () => {
++ const text=bundle([{path:'source.mjs',content:'trusted bytes'}]);
++ assert.throws(()=>extractReviewFiles(text.replace('trusted bytes','tampered bytes')), /size|checksum/);
++ assert.throws(()=>extractReviewFiles(text.replaceAll('source.mjs','../data.json')), /Forbidden/);
++ assert.throws(()=>extractReviewFiles(text.replace('"bytes": 13','"bytes": 1')), /size/);
++});
++test('reject incomplete bundles and duplicate structural sections', () => {
++ assert.throws(()=>extractReviewFiles('not a review bundle'));
++ const text=bundle([{path:'source.mjs',content:'console.log(1)'}]);
++ assert.throws(()=>extractReviewFiles(text+'\n## 源码快照\n'));
++ assert.throws(()=>extractReviewFiles(text.replace('### source.mjs','### missing.mjs')), /Missing/);
++});

@@ -1,0 +1,64 @@
+--- a/server.mjs
++++ b/server.mjs
+@@ -34,9 +34,9 @@
+     if (req.method === 'DELETE' && match && !match[2]) { save(projects.filter(p => p.id !== match[1])); return send(200, { ok: true }); }
+     if (req.method === 'POST' && (path === '/api/projects' || (match && !match[2]))) {
+       if (!req.headers['content-type']?.startsWith('application/json')) return send(415, { error: '需要 JSON 数据' });
+-      let body = '', bytes = 0;
+-      for await (const chunk of req) { bytes += chunk.length; if (bytes > 2_000_000) return send(413, { error: '内容过大，请控制在 2 MB 内' }); body += chunk; }
+-      let input; try { input = JSON.parse(body); } catch { return send(400, { error: 'JSON 格式无效' }); }
++      const chunks = []; let bytes = 0;
++      for await (const chunk of req) { bytes += chunk.length; if (bytes > 2_000_000) return send(413, { error: '内容过大，请控制在 2 MB 内' }); chunks.push(chunk); }
++      let input; try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return send(400, { error: 'JSON 格式无效' }); }
+       if (!input || typeof input !== 'object' || Array.isArray(input)) return send(400, { error: '需要 JSON 对象' });
+       const next = structuredClone(projects); let p;
+       if (!match) { p = createProject(input); next.unshift(p); }
+--- a/test/server.test.mjs
++++ b/test/server.test.mjs
+@@ -33,3 +33,46 @@
+   assert.equal((await fetch(service.url + '/../../domain.mjs')).status, 404);
+  } finally { if (service) await stop(service.child); rmSync(dir, { recursive: true, force: true }); }
+ });
++
++test('UTF-8 characters split across request chunks survive saving and handoff', async () => {
++  const dir = mkdtempSync(join(tmpdir(), 'agentsummary-utf8-'));
++  let service;
++  try {
++    service = await start(dir);
++    const title = '修复中文标题与 emoji 🧪';
++    const payload = Buffer.from(JSON.stringify({ ...input, title }));
++    // Split inside both a three-byte Chinese character and a four-byte emoji.
++    const chineseSplit = payload.indexOf(Buffer.from('修')) + 1;
++    const emojiSplit = payload.indexOf(Buffer.from('🧪')) + 2;
++    const response = await new Promise((resolve, reject) => {
++      const request = http.request(service.url + '/api/projects', {
++        method: 'POST',
++        headers: { 'content-type': 'application/json' },
++      }, result => {
++        const chunks = [];
++        result.on('data', chunk => chunks.push(chunk));
++        result.on('error', reject);
++        result.on('end', () => resolve({ status: result.statusCode, data: JSON.parse(Buffer.concat(chunks).toString('utf8')) }));
++      });
++      request.on('error', reject);
++      request.flushHeaders();
++      request.write(payload.subarray(0, chineseSplit));
++      // Separate network writes so the server receives partial UTF-8 sequences.
++      setTimeout(() => {
++        request.write(payload.subarray(chineseSplit, emojiSplit));
++        setTimeout(() => request.end(payload.subarray(emojiSplit)), 30);
++      }, 30);
++    });
++    assert.equal(response.status, 200);
++    assert.equal(response.data.title, title);
++    await stop(service.child);
++    service = await start(dir);
++    const restored = await (await fetch(service.url + '/api/projects/' + response.data.id)).json();
++    assert.equal(restored.title, title);
++    const pack = await (await fetch(service.url + '/api/projects/' + response.data.id + '/pack')).json();
++    assert.ok(pack.text.includes(title));
++  } finally {
++    if (service) await stop(service.child);
++    rmSync(dir, { recursive: true, force: true });
++  }
++});

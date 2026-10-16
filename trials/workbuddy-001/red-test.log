@@ -1,0 +1,31 @@
+✖ UTF-8 characters split across request chunks survive saving and handoff (115.97575ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 179.970208
+
+✖ failing tests:
+
+test at test/server.test.mjs:37:1
+✖ UTF-8 characters split across request chunks survive saving and handoff (115.97575ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '���复中文标题与 emoji ���'
+  - '修复中文标题与 emoji 🧪'
+  
+      at TestContext.<anonymous> (file:///Users/wayne/AgentSummary/test/server.test.mjs:67:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '���复中文标题与 emoji ���',
+    expected: '修复中文标题与 emoji 🧪',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

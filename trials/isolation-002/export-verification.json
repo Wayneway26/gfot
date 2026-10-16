@@ -1,0 +1,16 @@
+{
+  "files": 12,
+  "allHashesMatch": true,
+  "runtimeDataPathsIncluded": false,
+  "otherProjectDemoRecordIncluded": false,
+  "externalDispatch": false,
+  "boundary": "materials-only",
+  "sandboxProbe": {
+    "available": false,
+    "observedExitCodes": [
+      71,
+      134
+    ],
+    "note": "Current environment could not run the sandbox probe normally; no unsandboxed execution fallback enabled."
+  }
+}

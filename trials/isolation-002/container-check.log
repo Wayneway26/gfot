@@ -1,0 +1,176 @@
+=== isolation-boundaries: PASS ===
+{"sourceReadable":true,"sourceWriteDenied":true,"rootWriteDenied":true,"hostDataUnreadable":true,"dockerSocketAbsent":true,"externalNetworkDenied":true}
+
+=== syntax-check: PASS ===
+
+> agentsummary@0.1.0 check
+> node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js
+
+
+=== test-suite: PASS ===
+
+> agentsummary@0.1.0 test
+> node --test
+
+TAP version 13
+# Subtest: full handoff, independent review and explicit user acceptance
+ok 1 - full handoff, independent review and explicit user acceptance
+  ---
+  duration_ms: 1.194292
+  type: 'test'
+  ...
+# Subtest: missing evidence cannot advance implementation
+ok 2 - missing evidence cannot advance implementation
+  ---
+  duration_ms: 0.210542
+  type: 'test'
+  ...
+# Subtest: review of a different version is rejected
+ok 3 - review of a different version is rejected
+  ---
+  duration_ms: 0.249792
+  type: 'test'
+  ...
+# Subtest: review rejection preserves previous records and starts new implementation
+ok 4 - review rejection preserves previous records and starts new implementation
+  ---
+  duration_ms: 0.213416
+  type: 'test'
+  ...
+# Subtest: requirement revision invalidates old evidence and memory
+ok 5 - requirement revision invalidates old evidence and memory
+  ---
+  duration_ms: 0.193292
+  type: 'test'
+  ...
+# Subtest: blocking and resuming preserves the current step
+ok 6 - blocking and resuming preserves the current step
+  ---
+  duration_ms: 0.079084
+  type: 'test'
+  ...
+# Subtest: user rejection opens a new cycle and is included in next handoff
+ok 7 - user rejection opens a new cycle and is included in next handoff
+  ---
+  duration_ms: 0.131458
+  type: 'test'
+  ...
+# Subtest: cancellation preserves audit and prevents further execution
+ok 8 - cancellation preserves audit and prevents further execution
+  ---
+  duration_ms: 0.445916
+  type: 'test'
+  ...
+# Subtest: rework handoff includes actual prior change and preserves dispatched input
+ok 9 - rework handoff includes actual prior change and preserves dispatched input
+  ---
+  duration_ms: 0.237417
+  type: 'test'
+  ...
+# Subtest: new requirements retain history without importing obsolete review instructions
+ok 10 - new requirements retain history without importing obsolete review instructions
+  ---
+  duration_ms: 0.254208
+  type: 'test'
+  ...
+# Subtest: new revision clears previous acceptance
+ok 11 - new revision clears previous acceptance
+  ---
+  duration_ms: 0.113375
+  type: 'test'
+  ...
+# Subtest: memory records the evidence version explicitly
+ok 12 - memory records the evidence version explicitly
+  ---
+  duration_ms: 0.044916
+  type: 'test'
+  ...
+# Subtest: bundle covers all selected bytes with hashes and contains no repo path or session history
+ok 13 - bundle covers all selected bytes with hashes and contains no repo path or session history
+  ---
+  duration_ms: 1.459666
+  type: 'test'
+  ...
+# Subtest: filesystem escapes, hidden paths, data and credential files are rejected
+ok 14 - filesystem escapes, hidden paths, data and credential files are rejected
+  ---
+  duration_ms: 0.798167
+  type: 'test'
+  ...
+# Subtest: unselected files cannot enter a bundle and an arbitrary path never causes a disk read
+ok 15 - unselected files cannot enter a bundle and an arbitrary path never causes a disk read
+  ---
+  duration_ms: 0.426666
+  type: 'test'
+  ...
+# Subtest: reject invalid payloads, duplicate paths, binary contents and oversized selections
+ok 16 - reject invalid payloads, duplicate paths, binary contents and oversized selections
+  ---
+  duration_ms: 5.037375
+  type: 'test'
+  ...
+# Subtest: bundle identity changes with input bytes, task or review version; input order is irrelevant
+ok 17 - bundle identity changes with input bytes, task or review version; input order is irrelevant
+  ---
+  duration_ms: 4.35725
+  type: 'test'
+  ...
+# Subtest: cannot export without current implementation or explicit version confirmation
+ok 18 - cannot export without current implementation or explicit version confirmation
+  ---
+  duration_ms: 0.145458
+  type: 'test'
+  ...
+# Subtest: source fence injection cannot break out of the exported code block
+ok 19 - source fence injection cannot break out of the exported code block
+  ---
+  duration_ms: 0.115875
+  type: 'test'
+  ...
+# Subtest: HTTP validation, persistence across restart, exports and cross-origin isolation
+ok 20 - HTTP validation, persistence across restart, exports and cross-origin isolation
+  ---
+  duration_ms: 195.753583
+  type: 'test'
+  ...
+# Subtest: UTF-8 characters split across request chunks survive saving and handoff
+ok 21 - UTF-8 characters split across request chunks survive saving and handoff
+  ---
+  duration_ms: 148.157375
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 467.206542
+
+{
+  "image": "node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402",
+  "files": 12,
+  "network": "none",
+  "snapshot": "read-only",
+  "hostRepositoryMounted": false,
+  "externalDesktopAgentConfined": false,
+  "checks": [
+    {
+      "label": "isolation-boundaries",
+      "ok": true,
+      "exitCode": 0
+    },
+    {
+      "label": "syntax-check",
+      "ok": true,
+      "exitCode": 0
+    },
+    {
+      "label": "test-suite",
+      "ok": true,
+      "exitCode": 0
+    }
+  ]
+}

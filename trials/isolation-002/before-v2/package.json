@@ -1,0 +1,14 @@
+{
+  "name": "agentsummary",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test",
+    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

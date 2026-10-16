@@ -1,0 +1,37 @@
+{
+  "version": "isolation-98e89a3d6384",
+  "files": [
+    {
+      "path": "review-bundle.mjs",
+      "sha256": "241d46bf61b99e1b62cbfe6d696b5c0e32b6bb8ada0098bbfc66c0a82a16c194"
+    },
+    {
+      "path": "public/review-policy.js",
+      "sha256": "4f5f22b8f7ae672ca0b43f7cbc32cd3f7bd7f8c6ed2e74e808cf8ef520c81018"
+    },
+    {
+      "path": "public/review-export.js",
+      "sha256": "e4fe157b586d4b2a94c6371088a55d8a14ed5c0abd8d0956a53e3bc7f15792c4"
+    },
+    {
+      "path": "public/app.js",
+      "sha256": "cb4a17bf601ac81b21931970af83d83eb73241db50ca35879cd5346565eb5527"
+    },
+    {
+      "path": "server.mjs",
+      "sha256": "f5cfa14d3be14aa1559d66856686cca68bbb1fcef9e8b31deb542c27c9fd1111"
+    },
+    {
+      "path": "package.json",
+      "sha256": "5235272e3d97613b82821c17d0996da41fde4711171f4a6099a59aba1b838eb2"
+    },
+    {
+      "path": "test/review-bundle.test.mjs",
+      "sha256": "edb55dfcb799fa1a540e4cfff506e8afb641a18e252891111a7b32b7f361aa17"
+    },
+    {
+      "path": "test/server.test.mjs",
+      "sha256": "1c2399016b8289afb47e713a35b1cc9dae90b033f7e0886e8adcf25add72b484"
+    }
+  ]
+}

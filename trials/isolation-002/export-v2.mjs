@@ -1,0 +1,11 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+const dir = 'trials/isolation-002';
+const meta = JSON.parse(readFileSync(dir+'/project.json','utf8'));
+const manifest = JSON.parse(readFileSync(dir+'/manifest.json','utf8'));
+const files = manifest.files.map(({path})=>({path,content:readFileSync(path,'utf8')}));
+const r = await fetch('http://127.0.0.1:4317/api/projects/'+meta.id+'/review-bundle',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({files,confirmVersion:meta.version})});
+if(!r.ok) throw Error(await r.text());
+const bundle = await r.json();
+writeFileSync(dir+'/review-copy-v2.md',bundle.text);
+writeFileSync(dir+'/bundle-v2.json',JSON.stringify({bundleId:bundle.bundleId,reviewedVersion:bundle.reviewedVersion,manifest:bundle.manifest,boundary:bundle.boundary},null,2));
+console.log(JSON.stringify({bundleId:bundle.bundleId,files:bundle.manifest.length}));

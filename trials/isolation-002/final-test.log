@@ -1,0 +1,36 @@
+
+> agentsummary@0.1.0 test
+> node --test
+
+✔ full handoff, independent review and explicit user acceptance (2.001875ms)
+✔ missing evidence cannot advance implementation (0.268ms)
+✔ review of a different version is rejected (0.478875ms)
+✔ review rejection preserves previous records and starts new implementation (0.434083ms)
+✔ requirement revision invalidates old evidence and memory (0.146625ms)
+✔ blocking and resuming preserves the current step (0.110042ms)
+✔ user rejection opens a new cycle and is included in next handoff (0.114875ms)
+✔ cancellation preserves audit and prevents further execution (0.053917ms)
+✔ rework handoff includes actual prior change and preserves dispatched input (0.078875ms)
+✔ new requirements retain history without importing obsolete review instructions (0.104833ms)
+✔ new revision clears previous acceptance (0.085875ms)
+✔ memory records the evidence version explicitly (0.046667ms)
+✔ bundle covers all selected bytes with hashes and contains no repo path or session history (3.270083ms)
+✔ filesystem escapes, hidden paths, data and credential files are rejected (1.06675ms)
+✔ unselected files cannot enter a bundle and an arbitrary path never causes a disk read (0.456583ms)
+✔ reject invalid payloads, duplicate paths, binary contents and oversized selections (1.402041ms)
+✔ bundle identity changes with input bytes, task or review version; input order is irrelevant (5.459709ms)
+✔ cannot export without current implementation or explicit version confirmation (0.17175ms)
+✔ source fence injection cannot break out of the exported code block (0.17375ms)
+✔ extract exact UTF-8 text including CRLF, empty files and embedded Markdown headings (8.008375ms)
+✔ reject tampered source content and inconsistent manifest before extracting files (0.341167ms)
+✔ reject incomplete bundles and duplicate structural sections (0.749916ms)
+✔ HTTP validation, persistence across restart, exports and cross-origin isolation (176.052959ms)
+✔ UTF-8 characters split across request chunks survive saving and handoff (154.829875ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 407.109917

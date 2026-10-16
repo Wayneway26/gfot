@@ -1,0 +1,4 @@
+
+> agentsummary@0.1.0 check
+> node --check server.mjs && node --check domain.mjs && node --check public/app.js
+
