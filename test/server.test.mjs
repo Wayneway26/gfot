@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const input = { title: 'HTTP integration fixture', goal: 'reject invalid input', repo: '/test/repo', baseline: 'abc', scope: 'login', criteria: 'tests pass', implementer: 'A', reviewer: 'B' };
@@ -91,4 +91,44 @@ test('UTF-8 characters split across request chunks survive saving and handoff', 
     if (service) await stop(service.child);
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('WorkBuddy authenticated API and real stdio MCP roundtrip survive restart', async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'agentsummary-bridge-'));let service;
+ try{
+  service=await start(dir);
+  let token=readFileSync(join(dir,'bridge-token'),'utf8');
+  const user=async(path,body)=>{const r=await fetch(service.url+'/api/projects'+path,{method:body?'POST':'GET',headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json()};};
+  const bridge=async(name,args={},auth=token)=>{const r=await fetch(service.url+'/api/bridge',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+auth},body:JSON.stringify({name,arguments:args})});return {status:r.status,data:await r.json()};};
+  assert.equal((await bridge('list_review_jobs',{},'wrong')).status,401);
+  const p=(await user('',input)).data;
+  await user('/'+p.id,{action:'dispatch'});
+  await user('/'+p.id,{action:'result',summary:'done',artifact:'diff',version:'mcp-v1',evidence:'log',tests:'passed',issues:'none',next:'review'});
+  assert.deepEqual((await bridge('list_review_jobs')).data.jobs,[]);
+  const publishing={files:[{path:'source.mjs',content:'export const add=(a,b)=>a+b;'}],confirmVersion:'mcp-v1',publishConsent:true};
+  const job=(await user('/'+p.id+'/workbuddy',publishing)).data;
+  const c=(await bridge('get_review_job',{jobId:job.id})).data;
+  assert.match(c.markdown,/export const add/);
+  const visible=(await user('/'+p.id)).data;
+  assert.ok(!JSON.stringify(visible).includes(c.claimToken));
+  assert.ok(!JSON.stringify(visible).includes('export const add'));
+  const configuration=await (await fetch(service.url+'/api/workbuddy/config')).json();
+  assert.ok(configuration.config.mcpServers.agentsummary.args.includes(join(dir,'bridge-token')));
+  assert.ok(!JSON.stringify(configuration).includes(token));
+  const messages=[{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'integration-test',version:'1'}}},{jsonrpc:'2.0',method:'notifications/initialized'},{jsonrpc:'2.0',id:2,method:'tools/list'},{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'bridge_status',arguments:{}}}];
+  const mcp=spawnSync(process.execPath,['scripts/workbuddy-mcp.mjs','--url',service.url,'--token-file',join(dir,'bridge-token')],{input:messages.map(m=>JSON.stringify(m)).join('\n')+'\n',encoding:'utf8',timeout:15000});
+  assert.equal(mcp.status,0,mcp.stderr);
+  const output=mcp.stdout.trim().split('\n').map(s=>JSON.parse(s));
+  assert.equal(output.length,3);assert.equal(output[1].result.tools.length,4);assert.ok(!output[2].result.isError);
+  assert.equal(JSON.parse(output[2].result.content[0].text).scope,'仅用户发布的审查副本');
+  await stop(service.child);service=await start(dir);
+  assert.equal(readFileSync(join(dir,'bridge-token'),'utf8'),token);
+  const submitted=await bridge('submit_review',{jobId:job.id,claimToken:c.claimToken,bundleId:c.bundleId,reviewedVersion:c.reviewedVersion,verdict:'pass',source:'test bridge',criteriaEvidence:'static check only',findings:'runtime not independently verified'});
+  assert.equal(submitted.status,200);assert.equal(submitted.data.applied,false);
+  assert.equal((await user('/'+p.id)).data.stage,'review');
+  await stop(service.child);service=await start(dir);
+  assert.equal((await user('/'+p.id)).data.reviewJobs[0].status,'submitted');
+  const applied=await user('/'+p.id,{action:'bridge_apply',jobId:job.id});assert.equal(applied.data.status,'awaiting');assert.ok(!applied.data.acceptance);
+  assert.equal((await bridge('read_file',{path:'/etc/passwd'})).status,400);
+ }finally{if(service)await stop(service.child);rmSync(dir,{recursive:true,force:true});}
 });

@@ -1,0 +1,19 @@
+const escape = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const jobLabels = {queued:'等待领取',reviewing:'已领取',submitted:'结果已接收',applied:'结果已应用',cancelled:'已取消',superseded:'已被重试替代',obsolete:'版本已失效',expired:'派发已过期'};
+export function bridgePanel(p) {
+  const job=p.reviewJobs?.at(-1);
+  if(!job)return '';
+  const active=['queued','reviewing','submitted','expired'].includes(job.status);
+  return `<section class="bridge-panel"><div class="section-head"><h2>WorkBuddy 连接器 <span class="tag">${jobLabels[job.status] || '未知状态'}</span></h2><button data-action="bridge_setup">连接配置</button></div><div class="bridge-details"><code>${escape(job.id)}</code><span>${job.fileCount} 个文件</span><code>${escape(job.bundleId)}</code></div><p class="hint">${job.status==='queued'?'副本已进入队列。请在 WorkBuddy 发起领取；发布不会自动唤起会话。':job.status==='reviewing'?'连接器已领取副本，等待返回结果。此状态不代表已自动验证执行进度。':job.status==='submitted'?'结果已保存，请核对后应用。应用审查结果不等于最终验收。':'派发历史保留。未采用或失效的结果不会自动推进项目。'}</p><div class="actions">${['queued','reviewing'].includes(job.status)?'<button data-action="bridge_prompt">复制领取指令</button>':''}${job.result?'<button data-action="bridge_result">查看返回结果</button>':''}${job.status==='submitted'?'<button class="primary" data-action="bridge_apply">核对并应用</button>':''}${active?'<button data-action="bridge_cancel">取消派发</button>':''}${['expired','cancelled'].includes(job.status)?'<button data-action="bridge_retry">重新派发</button>':''}</div></section>`;
+}
+export function bridgePrompt(job) {return `请使用 AgentSummary MCP 连接器审查派发 ${job.id}。先调用 get_review_job，参数 jobId 为 ${job.id}。只静态审查返回副本，不读取本地原目录，不运行命令，不调用其他工具访问项目。完成后调用 submit_review，原样返回领取凭证、bundleId、reviewedVersion，给出 pass 或 rework、来源、逐项证据和问题；不能验证的事项如实说明。不要替用户应用结果或验收。`;}
+export async function openBridgeSetup({modal,download}) {
+  const r=await fetch('/api/workbuddy/config');if(!r.ok)throw Error('连接配置读取失败');const data=await r.json();
+  modal('连接 WorkBuddy',`<p class="hint">在 WorkBuddy 的自定义连接器中添加以下 stdio 配置。服务只提供已发布副本的领取和结果提交，不读取仓库或验收项目。</p><pre class="pack-preview">${escape(JSON.stringify(data.config,null,2))}</pre><div class="actions"><button id="download-bridge-config" class="primary">下载连接配置</button></div><p class="note">这里没有可用的自动推送入口。配置完成后，在 WorkBuddy 发起任务，连接器才会领取。配置本身不发布任何源码，也不限制 WorkBuddy 其他已有工具的权限。</p>`);
+  document.querySelector('#download-bridge-config').onclick=()=>download('agentsummary-workbuddy-mcp.json',JSON.stringify(data.config,null,2),'application/json');
+}
+export function openBridgeResult(p,{modal,apply}) {
+  const job=p.reviewJobs?.at(-1);if(!job?.result)throw Error('尚未收到结果');const r=job.result;
+  modal('WorkBuddy 审查结果',`<div class="bundle-meta"><code>${escape(job.bundleId)}</code><span>${r.verdict==='pass'?'审查通过':'需要返工'}</span></div><p class="hint">代码版本：${escape(r.reviewedVersion)}</p><h2>逐项验收证据</h2><pre class="pack-preview">${escape(r.criteriaEvidence)}</pre><h2>问题与未验证事项</h2><pre class="pack-preview">${escape(r.findings)}</pre><p class="hint">来源：${escape(r.source)}</p>${job.status==='submitted'?'<div class="actions"><button class="primary" id="apply-bridge-result">确认应用此结果</button></div>':'<p class="hint">此结果已应用或已结束，不能重复应用。</p>'}<div id="bridge-result-error" class="error" role="alert"></div>`);
+  const button=document.querySelector('#apply-bridge-result');if(button)button.onclick=async()=>{button.disabled=true;try{await apply(job.id);document.querySelector('#dialog').close();}catch(error){document.querySelector('#bridge-result-error').textContent=error.message;button.disabled=false;}};
+}

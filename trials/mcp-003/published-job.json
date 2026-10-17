@@ -1,0 +1,19 @@
+{
+  "id": "ee21996b-16a1-4413-a445-a3ecc7b6d729",
+  "bundleId": "review-1e425ffe7bf62be7",
+  "version": "mcp-demo-v1",
+  "revision": 1,
+  "cycle": 1,
+  "status": "queued",
+  "createdAt": "2026-10-17T09:12:40.041Z",
+  "expiresAt": "2026-10-18T09:12:40.042Z",
+  "result": null,
+  "fileCount": 1,
+  "manifest": [
+    {
+      "path": "example.mjs",
+      "bytes": 36,
+      "sha256": "4a381860447226426a116b024081641b32f9b6c4f7c2c5d3cb86987e85c8ae33"
+    }
+  ]
+}

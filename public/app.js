@@ -1,3 +1,4 @@
+import { bridgePanel, bridgePrompt, openBridgeSetup, openBridgeResult } from './workbuddy.js';
 import { openReviewExport } from './review-export.js';
 const $ = (s, el = document) => el.querySelector(s);
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -39,6 +40,8 @@ function renderHome() {
     <div id="task-list">${projects.length ? projectRows() : `<div class="empty"><h2>还没有任务</h2><p>新建任务，填写目标、仓库和验收条件。</p>${button('新建任务', 'new', 'primary')}</div>`}</div>`;
 }
 function nextAction(p) {
+  const job=p.reviewJobs?.at(-1);
+  if(p.stage==='review' && p.status==='running' && job && ['queued','reviewing','submitted','expired'].includes(job.status)) return [job.status==='queued'?'审查副本等待领取':job.status==='reviewing'?'审查副本已领取':job.status==='submitted'?'审查结果已返回':'派发已过期',job.status==='submitted'?'核对证据与问题后应用，不会自动验收。':'通过 WorkBuddy 连接器领取与提交；状态以实际工具回执为依据。',button(job.status==='submitted'?'查看返回结果':'连接配置',job.status==='submitted'?'bridge_result':'bridge_setup','primary')];
   if (p.status === 'blocked') return ['任务已阻塞', escape(p.blockReason), button('解除阻塞', 'resume', 'primary')];
   if (p.status === 'accepted') return ['已验收', escape(p.acceptance), button('查看交付包', 'delivery')];
   if (p.status === 'cancelled') return ['任务已取消', '已保留此前的执行与交接记录。', ''];
@@ -67,7 +70,7 @@ function renderProject(p) {
   return `<div class="project-heading"><div class="project-reference">${escape(shortRepo(p.repo))}<span class="row-separator">/</span><code>${p.id.slice(0, 8)}</code></div><div class="title-line"><h1>${escape(p.title)}</h1>${statusTag(p)}</div><div class="project-meta-line">需求 v${p.revision}<span class="row-separator">·</span>第 ${p.cycle} 轮<span class="row-separator">·</span>更新于 ${formatDate(p.updatedAt)}</div></div>
     <div class="workflow" aria-label="任务阶段">${['实现', '审查', '交付'].map((name, i) => `<span class="workflow-step ${i === stage ? 'current' : i < stage ? 'done' : ''}" ${i === stage ? 'aria-current="step"' : ''}><span class="step-number">${i < stage ? '✓' : i + 1}</span>${name}</span>${i < 2 ? '<span class="step-line" aria-hidden="true"></span>' : ''}`).join('')}</div>
     <section class="action-strip"><div><h2>${guidance[0]}</h2><p>${guidance[1]}</p></div><div class="actions">${guidance[2]}</div></section>
-    <div class="project-layout"><div class="project-document"><div class="tabs" role="tablist" aria-label="任务详情">${[['overview', '概览'], ['records', '执行记录', p.runs.length + p.reviews.length], ['memory', '记忆', p.memories.length]].map(([value, label, count]) => `<button id="tab-${value}" role="tab" aria-controls="project-content" aria-selected="${activeTab === value}" tabindex="${activeTab === value ? 0 : -1}" data-tab="${value}">${label}${count !== undefined ? `<span class="tab-count">${count}</span>` : ''}</button>`).join('')}</div><div id="project-content" role="tabpanel" aria-labelledby="tab-${activeTab}">${activeTab === 'overview' ? overviewContent(p) : activeTab === 'memory' ? memoryContent(p) : recordsContent(p)}</div></div>
+    ${bridgePanel(p)}<div class="project-layout"><div class="project-document"><div class="tabs" role="tablist" aria-label="任务详情">${[['overview', '概览'], ['records', '执行记录', p.runs.length + p.reviews.length], ['memory', '记忆', p.memories.length]].map(([value, label, count]) => `<button id="tab-${value}" role="tab" aria-controls="project-content" aria-selected="${activeTab === value}" tabindex="${activeTab === value ? 0 : -1}" data-tab="${value}">${label}${count !== undefined ? `<span class="tab-count">${count}</span>` : ''}</button>`).join('')}</div><div id="project-content" role="tabpanel" aria-labelledby="tab-${activeTab}">${activeTab === 'overview' ? overviewContent(p) : activeTab === 'memory' ? memoryContent(p) : recordsContent(p)}</div></div>
     <section class="properties" aria-label="任务属性"><h2>属性</h2><dl><dt>仓库</dt><dd class="repo-path">${escape(p.repo)}</dd><dt>代码基准</dt><dd><code>${escape(p.baseline)}</code></dd><dt>实现</dt><dd><span class="agent-initial" aria-hidden="true">${escape(p.implementer.slice(0, 1))}</span>${escape(p.implementer)}</dd><dt>审查</dt><dd><span class="agent-initial" aria-hidden="true">${escape(p.reviewer.slice(0, 1))}</span>${escape(p.reviewer)}</dd><dt>创建于</dt><dd>${formatDate(p.createdAt)}</dd></dl><div class="property-actions">${button('编辑需求与版本', 'revise')}${button('导出项目数据', 'export')}${!['accepted', 'cancelled', 'blocked'].includes(p.status) ? button('标记阻塞', 'block') : ''}${!['accepted', 'cancelled'].includes(p.status) ? button('取消任务', 'cancel') : ''}</div><details class="project-options"><summary>更多操作</summary>${button('删除本地记录', 'delete', 'danger')}</details><p class="property-footnote">执行状态由用户记录。<br>任务包需在外部 Agent 中运行。</p></section></div>`;
 }
 function render() {
@@ -89,8 +92,14 @@ function create() { form('创建代码任务', field('title', '任务名称', ''
 async function action(name) {
   const p = projects.find(p => p.id === selected);
   if (name === 'new') return create();
-  if (!p) return;
-  if (name === 'bundle') return openReviewExport(p, { api, modal, download, toast });
+  if (!p && name !== 'bridge_setup') return;
+  if (name === 'bridge_setup') return openBridgeSetup({modal,download});
+  const job=p.reviewJobs?.at(-1);
+  const applyBridge=async jobId=>{await api('/'+p.id,{method:'POST',body:{action:'bridge_apply',jobId}});await refresh();};
+  if (name === 'bridge_result' || name === 'bridge_apply') return openBridgeResult(p,{modal,apply:applyBridge});
+  if (name === 'bridge_prompt') {try {await navigator.clipboard.writeText(bridgePrompt(job));toast('已复制领取指令');}catch{toast('复制失败，请在连接器中领取任务');}return;}
+  if (name === 'bridge_cancel' || name === 'bridge_retry') return form(name==='bridge_cancel'?'取消本次派发':'重新派发审查', '<p class="note">旧领取凭证和迟到结果将失效；记录仍然保留。</p>', '确认', async()=>{await api('/'+p.id,{method:'POST',body:{action:name,jobId:job.id}});});
+  if (name === 'bundle') return openReviewExport(p, { api, modal, download, toast, refresh });
   const send = values => api('/' + p.id, { method: 'POST', body: { ...values, action: name } });
   if (name === 'pack' || name === 'delivery') {
     const result = await api(`/${p.id}/${name}`); modal(name === 'pack' ? '交接包预览' : '统一交付包', `<p class="hint">检查后再发送；本地路径需要对方可访问，必要时附文件或 diff。</p><pre class="pack-preview">${escape(result.text)}</pre><div class="actions"><button id="copy-pack" class="primary">复制全文</button><button id="download-pack">下载 Markdown</button></div>`);
@@ -130,4 +139,11 @@ document.addEventListener('keydown', e => {
 });
 $('#overview').onclick = () => selectProject(null);
 $('#new-project').onclick = create;
+$('#bridge-settings').onclick = ()=>openBridgeSetup({modal,download}).catch(error=>toast(error.message));
+$('#bridge-settings-mobile').onclick = $('#bridge-settings').onclick;
+setInterval(async()=>{
+  const p=projects.find(p=>p.id===selected);
+  if(document.hidden || $('#dialog').open || !p?.reviewJobs?.some(j=>['queued','reviewing','submitted'].includes(j.status)))return;
+  try{const next=await api('');if(JSON.stringify(next)!==JSON.stringify(projects)){projects=next;render();}}catch{/* Keep the last saved view during temporary disconnects. */}
+},4000);
 refresh().catch(err => { $('#view').textContent = '加载失败：' + err.message; });

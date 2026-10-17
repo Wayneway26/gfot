@@ -249,3 +249,14 @@ textarea { resize: vertical; min-height: 78px; line-height: 1.7; }
 .bundle-manifest code { color: #a0a7b3; }
 .bundle-task-preview { font-size: 11px; color: #8a94a3; }
 @media(max-width:600px) { .bundle-pickers { grid-template-columns: 1fr; gap: 10px; } }
+.bridge-settings { margin-top:auto; text-align:left; border:0; background:transparent; font-size:11px; color:#858b98; padding:12px 9px; }
+.sidebar:has(.bridge-settings) footer { margin-top:0; padding-top:8px; }
+.bridge-panel { padding:18px; border:1px solid var(--line); border-radius:6px; margin:-8px 0 26px; }
+.bridge-panel .section-head { margin-bottom:10px; }
+.bridge-panel h2 { font-size:12px; }
+.bridge-panel button { font-size:11px; }
+.bridge-panel .hint { margin:10px 0 14px; }
+.bridge-details { display:flex; flex-wrap:wrap; gap:8px 14px; color:#949dab; font-size:10px; overflow-wrap:anywhere; }
+.bridge-panel .tag { margin-left:8px; }
+.bridge-mobile {display:none;}
+@media(max-width:600px) { .bridge-settings {display:none;} .bridge-mobile {display:block;border:0;background:transparent;font-size:11px;color:#727d8d;padding:0;} header .header-note {display:none;} }

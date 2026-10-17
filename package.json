@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test",
-    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js && node --check review-snapshot.mjs && node --check scripts/isolated-check.mjs"
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js && node --check review-snapshot.mjs && node --check scripts/isolated-check.mjs && node --check workbuddy-bridge.mjs && node --check bridge-tools.mjs && node --check scripts/workbuddy-mcp.mjs && node --check public/workbuddy.js"
   },
   "engines": {
     "node": ">=22"

@@ -1,7 +1,8 @@
+import { bridgePrompt } from './workbuddy.js';
 import { fileIssue, MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES } from './review-policy.js';
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const size = bytes => `${(bytes / 1000).toFixed(1)} KB`;
-export function openReviewExport(project, { api, modal, download, toast }) {
+export function openReviewExport(project, { api, modal, download, toast, refresh }) {
   const run = project.runs.findLast(r => r.revision === project.revision && r.cycle === project.cycle && !r.stale);
   if (!run) return toast('请先录入当前实现结果');
   modal('准备审查副本', `<p class="hint">选择文件后核对清单，再生成包含源码、差异和验收条件的单个 Markdown 文件。此操作不会发送给外部 Agent。</p><div class="bundle-pickers"><label>选择源码文件<input id="bundle-files" type="file" multiple></label><label>或选择项目目录<input id="bundle-folder" type="file" webkitdirectory multiple></label></div><div id="bundle-selection"><p class="hint">尚未选择文件。数据、隐藏配置、依赖与构建目录会被排除。</p></div><p class="note">副本不授予原目录访问权，也不能撤销外部 Agent 已有的本机权限。它不扫描源码中的秘密，发送前需要核对内容。</p><label class="bundle-confirm"><input type="checkbox" id="bundle-version">我确认选中的文件对应代码版本 <code>${escape(run.version)}</code></label><div id="bundle-error" class="error" role="alert"></div><div class="actions"><button id="bundle-generate" class="primary" disabled>生成预览</button></div>`);
@@ -47,8 +48,20 @@ export function openReviewExport(project, { api, modal, download, toast }) {
         files.push({ path: item.path, content });
       }
       const bundle = await api(`/${project.id}/review-bundle`, { method: 'POST', body: { files, confirmVersion: run.version } });
-      modal('审查副本预览', `<div class="bundle-meta"><code>${escape(bundle.bundleId)}</code><span>${bundle.manifest.length} 个文件 · ${size(bundle.totalBytes)}</span></div><p class="hint">代码版本：${escape(bundle.reviewedVersion)} · 材料隔离，非权限沙箱</p><div class="bundle-manifest">${bundle.manifest.map(file => `<div><span>${escape(file.path)}</span><code title="${file.sha256}">${file.sha256.slice(0, 12)}</code></div>`).join('')}</div><details class="bundle-task-preview"><summary>本次任务内容</summary><pre class="pack-preview">${escape(JSON.stringify(bundle.task, null, 2))}</pre></details><pre class="pack-preview">${escape(bundle.text)}</pre><div class="actions"><button id="bundle-download" class="primary">下载审查副本</button></div><p class="hint">下载不会自动改变任务状态。实际交给 Agent 后再确认发出。</p>`);
+      modal('审查副本预览', `<div class="bundle-meta"><code>${escape(bundle.bundleId)}</code><span>${bundle.manifest.length} 个文件 · ${size(bundle.totalBytes)}</span></div><p class="hint">代码版本：${escape(bundle.reviewedVersion)} · 材料隔离，非权限沙箱</p><div class="bundle-manifest">${bundle.manifest.map(file => `<div><span>${escape(file.path)}</span><code title="${file.sha256}">${file.sha256.slice(0, 12)}</code></div>`).join('')}</div><details class="bundle-task-preview"><summary>本次任务内容</summary><pre class="pack-preview">${escape(JSON.stringify(bundle.task, null, 2))}</pre></details><pre class="pack-preview">${escape(bundle.text)}</pre><div class="actions"><button id="bundle-download" class="primary">下载审查副本</button></div><label class="bundle-confirm"><input type="checkbox" id="publish-consent">我授权 WorkBuddy 通过连接器读取以上副本；材料可能发送至其模型服务。发布后仅此副本会保存在本机派发队列。</label><div class="actions"><button id="publish-workbuddy" disabled>发布到 WorkBuddy 队列</button></div><div id="publish-error" class="error" role="alert"></div><p class="hint">下载不会自动改变任务状态。实际交给 Agent 后再确认发出。</p>`);
       document.querySelector('#bundle-download').onclick = () => download(`${bundle.bundleId}.md`, bundle.text);
+      const publishButton=document.querySelector('#publish-workbuddy');
+      document.querySelector('#publish-consent').onchange=e=>{publishButton.disabled=!e.target.checked;};
+      publishButton.onclick=async()=>{
+        publishButton.disabled=true;
+        try {
+          const job=await api(`/${project.id}/workbuddy`,{method:'POST',body:{files,confirmVersion:run.version,publishConsent:true}});
+          await refresh();
+          modal('已发布，等待 WorkBuddy 领取',`<p class="hint">副本已保存到本机队列。请将以下指令交给已配置连接器的 WorkBuddy；这一步不会自动唤起 Agent。</p><pre class="pack-preview">${escape(bridgePrompt(job))}</pre><div class="actions"><button id="copy-workbuddy-prompt" class="primary">复制领取指令</button></div>`);
+          document.querySelector('#copy-workbuddy-prompt').onclick=async()=>{try{await navigator.clipboard.writeText(bridgePrompt(job));toast('已复制');}catch{toast('请手工复制以上指令');}};
+        } catch(err){document.querySelector('#publish-error').textContent=err.message;publishButton.disabled=false;}
+      };
+
     } catch (err) {
       error.textContent = err instanceof TypeError ? '读取失败：请确认选择的都是有效 UTF-8 文本，或减少文件数量。' : err.message;
       update();

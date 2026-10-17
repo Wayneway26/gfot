@@ -1,0 +1,34 @@
+{
+  "observedAt": "2026-10-17T09:13:39.885Z",
+  "projectId": "bba7fe79-d5a2-43ad-9ab4-f925a3cd4cf3",
+  "stage": "review",
+  "projectStatus": "running",
+  "applied": false,
+  "job": {
+    "id": "ee21996b-16a1-4413-a445-a3ecc7b6d729",
+    "bundleId": "review-1e425ffe7bf62be7",
+    "version": "mcp-demo-v1",
+    "revision": 1,
+    "cycle": 1,
+    "status": "submitted",
+    "createdAt": "2026-10-17T09:12:40.041Z",
+    "expiresAt": "2026-10-18T09:12:40.042Z",
+    "result": {
+      "verdict": "pass",
+      "reviewedVersion": "mcp-demo-v1",
+      "source": "仅基于 AgentSummary MCP get_review_job 返回的审查副本 review-1e425ffe7bf62be7（代码交付版本 mcp-demo-v1）中的源码快照与差异文本；静态阅读 example.mjs 单行实现，未读取原项目目录、未追踪文件路径、未执行代码或安装依赖。",
+      "criteriaEvidence": "逐项对照（仅静态检查副本内example.mjs 快照，未运行任何命令/测试）：\n1) 「函数使用 a + b 返回两个数的和」——满足。证据：源码快照共一行 `export const add = (a, b) => a + b;`，差异引用亦为 `+新增 export const add = (a, b) => a + b;`。箭头函数体为单个表达式 a + b，直接求值即隐式 return 两数之和；常量导出形式，符合“函数返回两数之和”的字面要求。文件字节数36 与单行快照一致，无额外分支、副作用或覆盖实现。\n2) 「不能运行命令的事项如实注明」——满足（按要求如实披露）。本轮未执行 node、未安装依赖、未做 import/调用验证，因此不存在任何运行时证据；副本“执行端提供的验证记录”亦标注“未运行”，本次判定完全基于静态阅读，不得当作执行验证。\n说明：本次仅做合成示例的 MCP 领取/回传联调，不代表产品源码通过审查；未替用户应用结果或验收，最终验收权保留给用户。",
+      "findings": "阻断问题：无。\n非阻断建议：1) add 依赖 JS 隐式数值相加，对非数值入参（字符串/NaN/undefined）不做校验或TypeError 保护，若后续用于真实业务建议补入参类型约束或断言；2) 导出名为 add 而未标注 JSDoc 类型签名，可选补充便于后续调用方预期。以上均为示例演示代码的增强项，不影响当前验收条件。\n未验证事项：未运行 node 或任何测试，未做 import 冒烟验证，未验证模块导出在真实宿主中的可用性；副本未提供原项目目录访问权，也未追踪源码路径；本次未使用其他连接器、未读写本地文件、未使用记忆系统。"
+    },
+    "claimedAt": "2026-10-17T09:13:09.672Z",
+    "submittedAt": "2026-10-17T09:13:15.432Z",
+    "fileCount": 1,
+    "manifest": [
+      {
+        "path": "example.mjs",
+        "bytes": 36,
+        "sha256": "4a381860447226426a116b024081641b32f9b6c4f7c2c5d3cb86987e85c8ae33"
+      }
+    ]
+  }
+}
