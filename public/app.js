@@ -1,3 +1,4 @@
+import { continuationPanel, continuationAction, continuationGuidance } from './handoff.js';
 import { bridgePanel, bridgePrompt, openBridgeSetup, openBridgeResult } from './workbuddy.js';
 import { openReviewExport } from './review-export.js';
 const $ = (s, el = document) => el.querySelector(s);
@@ -40,6 +41,8 @@ function renderHome() {
     <div id="task-list">${projects.length ? projectRows() : `<div class="empty"><h2>还没有任务</h2><p>新建任务，填写目标、仓库和验收条件。</p>${button('新建任务', 'new', 'primary')}</div>`}</div>`;
 }
 function nextAction(p) {
+  const continuation=continuationGuidance(p,{button});
+  if(continuation)return continuation;
   const job=p.reviewJobs?.at(-1);
   if(p.stage==='review' && p.status==='running' && job && ['queued','reviewing','submitted','expired'].includes(job.status)) return [job.status==='queued'?'审查副本等待领取':job.status==='reviewing'?'审查副本已领取':job.status==='submitted'?'审查结果已返回':'派发已过期',job.status==='submitted'?'核对证据与问题后应用，不会自动验收。':'通过 WorkBuddy 连接器领取与提交；状态以实际工具回执为依据。',button(job.status==='submitted'?'查看返回结果':'连接配置',job.status==='submitted'?'bridge_result':'bridge_setup','primary')];
   if (p.status === 'blocked') return ['任务已阻塞', escape(p.blockReason), button('解除阻塞', 'resume', 'primary')];
@@ -70,8 +73,8 @@ function renderProject(p) {
   return `<div class="project-heading"><div class="project-reference">${escape(shortRepo(p.repo))}<span class="row-separator">/</span><code>${p.id.slice(0, 8)}</code></div><div class="title-line"><h1>${escape(p.title)}</h1>${statusTag(p)}</div><div class="project-meta-line">需求 v${p.revision}<span class="row-separator">·</span>第 ${p.cycle} 轮<span class="row-separator">·</span>更新于 ${formatDate(p.updatedAt)}</div></div>
     <div class="workflow" aria-label="任务阶段">${['实现', '审查', '交付'].map((name, i) => `<span class="workflow-step ${i === stage ? 'current' : i < stage ? 'done' : ''}" ${i === stage ? 'aria-current="step"' : ''}><span class="step-number">${i < stage ? '✓' : i + 1}</span>${name}</span>${i < 2 ? '<span class="step-line" aria-hidden="true"></span>' : ''}`).join('')}</div>
     <section class="action-strip"><div><h2>${guidance[0]}</h2><p>${guidance[1]}</p></div><div class="actions">${guidance[2]}</div></section>
-    ${bridgePanel(p)}<div class="project-layout"><div class="project-document"><div class="tabs" role="tablist" aria-label="任务详情">${[['overview', '概览'], ['records', '执行记录', p.runs.length + p.reviews.length], ['memory', '记忆', p.memories.length]].map(([value, label, count]) => `<button id="tab-${value}" role="tab" aria-controls="project-content" aria-selected="${activeTab === value}" tabindex="${activeTab === value ? 0 : -1}" data-tab="${value}">${label}${count !== undefined ? `<span class="tab-count">${count}</span>` : ''}</button>`).join('')}</div><div id="project-content" role="tabpanel" aria-labelledby="tab-${activeTab}">${activeTab === 'overview' ? overviewContent(p) : activeTab === 'memory' ? memoryContent(p) : recordsContent(p)}</div></div>
-    <section class="properties" aria-label="任务属性"><h2>属性</h2><dl><dt>仓库</dt><dd class="repo-path">${escape(p.repo)}</dd><dt>代码基准</dt><dd><code>${escape(p.baseline)}</code></dd><dt>实现</dt><dd><span class="agent-initial" aria-hidden="true">${escape(p.implementer.slice(0, 1))}</span>${escape(p.implementer)}</dd><dt>审查</dt><dd><span class="agent-initial" aria-hidden="true">${escape(p.reviewer.slice(0, 1))}</span>${escape(p.reviewer)}</dd><dt>创建于</dt><dd>${formatDate(p.createdAt)}</dd></dl><div class="property-actions">${button('编辑需求与版本', 'revise')}${button('导出项目数据', 'export')}${!['accepted', 'cancelled', 'blocked'].includes(p.status) ? button('标记阻塞', 'block') : ''}${!['accepted', 'cancelled'].includes(p.status) ? button('取消任务', 'cancel') : ''}</div><details class="project-options"><summary>更多操作</summary>${button('删除本地记录', 'delete', 'danger')}</details><p class="property-footnote">执行状态由用户记录。<br>任务包需在外部 Agent 中运行。</p></section></div>`;
+    ${continuationPanel(p)}${bridgePanel(p)}<div class="project-layout"><div class="project-document"><div class="tabs" role="tablist" aria-label="任务详情">${[['overview', '概览'], ['records', '执行记录', p.runs.length + p.reviews.length], ['memory', '记忆', p.memories.length]].map(([value, label, count]) => `<button id="tab-${value}" role="tab" aria-controls="project-content" aria-selected="${activeTab === value}" tabindex="${activeTab === value ? 0 : -1}" data-tab="${value}">${label}${count !== undefined ? `<span class="tab-count">${count}</span>` : ''}</button>`).join('')}</div><div id="project-content" role="tabpanel" aria-labelledby="tab-${activeTab}">${activeTab === 'overview' ? overviewContent(p) : activeTab === 'memory' ? memoryContent(p) : recordsContent(p)}</div></div>
+    <section class="properties" aria-label="任务属性"><h2>属性</h2><dl><dt>仓库</dt><dd class="repo-path">${escape(p.repo)}</dd><dt>代码基准</dt><dd><code>${escape(p.baseline)}</code></dd><dt>实现</dt><dd><span class="agent-initial" aria-hidden="true">${escape(p.implementer.slice(0, 1))}</span>${escape(p.implementer)}</dd><dt>审查</dt><dd><span class="agent-initial" aria-hidden="true">${escape(p.reviewer.slice(0, 1))}</span>${escape(p.reviewer)}</dd><dt>创建于</dt><dd>${formatDate(p.createdAt)}</dd></dl><div class="property-actions">${p.stage==='implement' && ['ready','running','rework'].includes(p.status)?button('切换执行端','handoff_publish'):''}${button('编辑需求与版本', 'revise')}${button('导出项目数据', 'export')}${!['accepted', 'cancelled', 'blocked'].includes(p.status) ? button('标记阻塞', 'block') : ''}${!['accepted', 'cancelled'].includes(p.status) ? button('取消任务', 'cancel') : ''}</div><details class="project-options"><summary>更多操作</summary>${button('删除本地记录', 'delete', 'danger')}</details><p class="property-footnote">执行状态由用户记录。<br>任务包需在外部 Agent 中运行。</p></section></div>`;
 }
 function render() {
   const p = projects.find(p => p.id === selected);
@@ -94,6 +97,7 @@ async function action(name) {
   if (name === 'new') return create();
   if (!p && name !== 'bridge_setup') return;
   if (name === 'bridge_setup') return openBridgeSetup({modal,download});
+  if(name.startsWith('handoff_'))return continuationAction(name,p,{form,field,api,modal,download,toast});
   const job=p.reviewJobs?.at(-1);
   const applyBridge=async jobId=>{await api('/'+p.id,{method:'POST',body:{action:'bridge_apply',jobId}});await refresh();};
   if (name === 'bridge_result' || name === 'bridge_apply') return openBridgeResult(p,{modal,apply:applyBridge});
@@ -110,7 +114,7 @@ async function action(name) {
   if (name === 'result') return form('带回实现结果', field('summary', '完成内容', '', true) + field('artifact', '提交引用或 diff（接收方必须可访问）', '', true) + field('version', '当前代码版本或快照标识') + field('evidence', '关键决策、约束与证据', '', true) + field('tests', '验证方式与结果，明确未执行项', '', true) + field('issues', '已知问题 / 待验证判断', '无', true) + field('next', '下一步动作与完成条件', '对照原始验收条件进行独立审查', true) + '<label>原始输出（可选）<textarea name="raw"></textarea></label>', '保存并进入审查', send, true);
   if (name === 'review') return form('带回独立审查结果', `<label>审查结论<select name="verdict" aria-label="审查结论"><option value="rework">存在阻断问题，需要返工</option><option value="pass">无阻断问题，可提交用户验收</option></select></label>` + field('reviewedVersion', '实际审查的代码版本', '', false, '须与本轮实现版本完全一致') + field('source', '审查执行端 / 独立会话说明', p.reviewer) + field('criteriaEvidence', '逐项验收判断与证据', '', true) + field('findings', '阻断问题、建议及未验证事项（无则填无）', '', true), '保存审查结论', send, true);
   if (name === 'memory') return form('记录项目结论', '<label>类型<select name="kind" aria-label="类型"><option>事实</option><option>决策</option><option>假设</option></select></label>' + field('text', '结论', '', true) + field('evidence', '来源 / 文件版本 / 验证证据', '', true) + field('version', '证据对应代码版本', p.runs.findLast(r => r.revision === p.revision && !r.stale)?.version || p.baseline), '保存结论', send);
-  if (name === 'revise') return form('更新需求与代码版本', '<p class="note">这会开启新一轮实现，既有结果、审查和记忆将待复核。此前记录保留。</p>' + field('goal', '目标', p.goal, true) + field('criteria', '验收条件', p.criteria, true) + field('baseline', '代码基准', p.baseline), '更新并重新开始', send);
+  if (name === 'revise') return form('更新需求与代码版本', '<p class="note">这会开启新一轮实现，既有结果、审查和记忆将待复核。此前记录保留。</p>' + field('repo', '仓库位置（改名或迁移后更新）', p.repo) + field('goal', '目标', p.goal, true) + field('criteria', '验收条件', p.criteria, true) + field('baseline', '代码基准', p.baseline), '更新并重新开始', send);
   if (name === 'accept') return form('确认交付验收', '<p class="note">请确认已检查实际代码变更、逐项验收证据与剩余风险。</p>' + field('note', '验收说明', '', true), '确认验收通过', send);
   if (name === 'block' || name === 'reject') return form(name === 'block' ? '标记阻塞' : '退回实现', field('reason', name === 'block' ? '阻塞原因与解除条件' : '退回原因与修复要求', '', true), '确认', send);
   if (name === 'cancel') return form('取消任务', '<p>取消后保留已有记录，但不能继续执行。</p>', '确认取消', send);
@@ -143,7 +147,7 @@ $('#bridge-settings').onclick = ()=>openBridgeSetup({modal,download}).catch(erro
 $('#bridge-settings-mobile').onclick = $('#bridge-settings').onclick;
 setInterval(async()=>{
   const p=projects.find(p=>p.id===selected);
-  if(document.hidden || $('#dialog').open || !p?.reviewJobs?.some(j=>['queued','reviewing','submitted'].includes(j.status)))return;
+  if(document.hidden || $('#dialog').open || !(p?.reviewJobs?.some(j=>['queued','reviewing','submitted'].includes(j.status)) || p?.handoffs?.some(h=>['offered','claimed'].includes(h.status))))return;
   try{const next=await api('');if(JSON.stringify(next)!==JSON.stringify(projects)){projects=next;render();}}catch{/* Keep the last saved view during temporary disconnects. */}
 },4000);
 refresh().catch(err => { $('#view').textContent = '加载失败：' + err.message; });

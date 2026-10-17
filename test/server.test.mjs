@@ -119,7 +119,7 @@ test('WorkBuddy authenticated API and real stdio MCP roundtrip survive restart',
   const mcp=spawnSync(process.execPath,['scripts/workbuddy-mcp.mjs','--url',service.url,'--token-file',join(dir,'bridge-token')],{input:messages.map(m=>JSON.stringify(m)).join('\n')+'\n',encoding:'utf8',timeout:15000});
   assert.equal(mcp.status,0,mcp.stderr);
   const output=mcp.stdout.trim().split('\n').map(s=>JSON.parse(s));
-  assert.equal(output.length,3);assert.equal(output[1].result.tools.length,4);assert.ok(!output[2].result.isError);
+  assert.equal(output.length,3);assert.equal(output[1].result.tools.length,9);assert.ok(!output[2].result.isError);
   assert.equal(JSON.parse(output[2].result.content[0].text).scope,'仅用户发布的审查副本');
   await stop(service.child);service=await start(dir);
   assert.equal(readFileSync(join(dir,'bridge-token'),'utf8'),token);

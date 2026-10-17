@@ -20,7 +20,7 @@ async function request(message) {
   if (method === 'initialize') {
     initialized=true;
     const versions=['2025-06-18','2024-11-05'];
-    return {jsonrpc:'2.0',id,result:{protocolVersion:versions.includes(params.protocolVersion)?params.protocolVersion:versions[0],capabilities:{tools:{}},serverInfo:{name:'agentsummary-workbuddy',version:'0.2.0'},instructions:'只操作用户明确发布的审查副本。使用 list_review_jobs、get_review_job、submit_review。不得读取原项目或使用其他工具越界；最终应用和验收由用户完成。'}};
+    return {jsonrpc:'2.0',id,result:{protocolVersion:versions.includes(params.protocolVersion)?params.protocolVersion:versions[0],capabilities:{tools:{}},serverInfo:{name:'agentsummary-workbuddy',version:'0.2.0'},instructions:'只操作用户明确发布的审查副本或接续交接。审查使用 get_review_job/submit_review；接续使用 get_handoff/claim_handoff/save_checkpoint/complete_handoff。审查不得读取原目录；接续须遵守用户授权的目录和范围，不自动授予文件权限。最终验收由用户完成。'}};
   }
   if (!initialized) return error(-32002,'Initialize first');
   if (method === 'ping') return {jsonrpc:'2.0',id,result:{}};

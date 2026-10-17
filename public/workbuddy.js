@@ -9,7 +9,7 @@ export function bridgePanel(p) {
 export function bridgePrompt(job) {return `请使用 AgentSummary MCP 连接器审查派发 ${job.id}。先调用 get_review_job，参数 jobId 为 ${job.id}。只静态审查返回副本，不读取本地原目录，不运行命令，不调用其他工具访问项目。完成后调用 submit_review，原样返回领取凭证、bundleId、reviewedVersion，给出 pass 或 rework、来源、逐项证据和问题；不能验证的事项如实说明。不要替用户应用结果或验收。`;}
 export async function openBridgeSetup({modal,download}) {
   const r=await fetch('/api/workbuddy/config');if(!r.ok)throw Error('连接配置读取失败');const data=await r.json();
-  modal('连接 WorkBuddy',`<p class="hint">在 WorkBuddy 的自定义连接器中添加以下 stdio 配置。服务只提供已发布副本的领取和结果提交，不读取仓库或验收项目。</p><pre class="pack-preview">${escape(JSON.stringify(data.config,null,2))}</pre><div class="actions"><button id="download-bridge-config" class="primary">下载连接配置</button></div><p class="note">这里没有可用的自动推送入口。配置完成后，在 WorkBuddy 发起任务，连接器才会领取。配置本身不发布任何源码，也不限制 WorkBuddy 其他已有工具的权限。</p>`);
+  modal('连接 WorkBuddy',`<p class="hint">在 WorkBuddy 的自定义连接器中添加以下 stdio 配置。服务提供已发布审查副本或项目接续交接的领取与回传；不读取仓库或验收项目。</p><pre class="pack-preview">${escape(JSON.stringify(data.config,null,2))}</pre><details><summary>Codex 配置（合入 .codex/config.toml）</summary><pre class="pack-preview">${escape('[mcp_servers.agentsummary]\ncommand = '+JSON.stringify(data.config.mcpServers.agentsummary.command)+'\nargs = '+JSON.stringify(data.config.mcpServers.agentsummary.args))}</pre></details><div class="actions"><button id="download-bridge-config" class="primary">下载连接配置</button></div><p class="note">这里没有可用的自动推送入口。配置完成后，在 WorkBuddy 发起任务，连接器才会领取。同一 stdio 服务也可配置到 Codex。配置本身不发布材料，也不限制客户端其他已有工具的权限。目录迁移后请重新生成配置。</p>`);
   document.querySelector('#download-bridge-config').onclick=()=>download('agentsummary-workbuddy-mcp.json',JSON.stringify(data.config,null,2),'application/json');
 }
 export function openBridgeResult(p,{modal,apply}) {

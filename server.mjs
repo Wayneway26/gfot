@@ -1,3 +1,4 @@
+import { publishHandoff, cancelHandoff, handoffTool, invalidateHandoffs } from './handoff.mjs';
 import http from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync, writeFileSync, renameSync, mkdirSync, chmodSync } from 'node:fs';
@@ -20,7 +21,7 @@ let projects;
 try { projects = JSON.parse(readFileSync(file, 'utf8')); if (!Array.isArray(projects)) throw new Error('Invalid database'); }
 catch (e) { if (e.code === 'ENOENT') projects = []; else throw e; }
 function save(next) { writeFileSync(file + '.tmp', JSON.stringify(next, null, 2), { mode: 0o600 }); renameSync(file + '.tmp', file); projects = next; }
-const publicFiles = { '/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css', '/review-policy.js': 'review-policy.js', '/review-export.js': 'review-export.js', '/workbuddy.js': 'workbuddy.js' };
+const publicFiles = { '/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css', '/review-policy.js': 'review-policy.js', '/review-export.js': 'review-export.js', '/workbuddy.js': 'workbuddy.js', '/handoff.js':'handoff.js' };
 const server = http.createServer(async (req, res) => {
   const send = (code, value) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
   try {
@@ -35,7 +36,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(readFileSync(join(root, 'public', name)));
     }
     if (req.method === 'GET' && path === '/api/projects') return send(200, projects.map(projectView));
-    if (req.method === 'GET' && path === '/api/workbuddy/config') return send(200, { config:{mcpServers:{agentsummary:{type:'stdio',command:process.execPath,args:[join(root,'scripts/workbuddy-mcp.mjs'),'--url',`http://${host}`,'--token-file',tokenFile]}}}, scope:'仅用户发布的副本；可领取、提交，不能读取原目录或最终验收', automaticPush:false });
+    if (req.method === 'GET' && path === '/api/workbuddy/config') return send(200, { config:{mcpServers:{agentsummary:{type:'stdio',command:process.execPath,args:[join(root,'scripts/workbuddy-mcp.mjs'),'--url',`http://${host}`,'--token-file',tokenFile]}}}, scope:'仅用户主动发布的审查副本或接续交接；无文件系统、命令执行或最终验收工具', automaticPush:false });
     if (req.method === 'POST' && path === '/api/bridge' && !bridgeAuthorized(req)) return send(401,{error:'桥接凭证无效'});
     const match = path.match(/^\/api\/projects\/([^/]+)(?:\/(pack|delivery|review-bundle|workbuddy))?$/);
     if (req.method === 'GET' && match && !['review-bundle','workbuddy'].includes(match[2])) {
@@ -51,8 +52,9 @@ const server = http.createServer(async (req, res) => {
       if (!input || typeof input !== 'object' || Array.isArray(input)) return send(400, { error: '需要 JSON 对象' });
       if (path === '/api/bridge') {
         const next = structuredClone(projects);
-        const result = bridgeTool(next, input.name, input.arguments);
-        if (['get_review_job','submit_review'].includes(input.name)) save(next);
+        const continuationTools=['list_handoffs','get_handoff','claim_handoff','save_checkpoint','complete_handoff'];
+        const result = continuationTools.includes(input.name) ? handoffTool(next,input.name,input.arguments) : bridgeTool(next, input.name, input.arguments);
+        if (['get_review_job','submit_review','claim_handoff','save_checkpoint','complete_handoff'].includes(input.name)) save(next);
         return send(200,result);
       }
       if (match?.[2] === 'workbuddy') {
@@ -67,7 +69,7 @@ const server = http.createServer(async (req, res) => {
       }
       const next = structuredClone(projects); let p;
       if (!match) { p = createProject(input); next.unshift(p); }
-      else { p = next.find(x => x.id === match[1]); if (!p) return send(404, { error: '项目不存在' }); if (['bridge_apply','bridge_retry','bridge_cancel'].includes(input.action)) reviewJobAction(p,input); else { act(p, input.action, input); invalidateJobs(p); } }
+      else { p = next.find(x => x.id === match[1]); if (!p) return send(404, { error: '项目不存在' }); if (input.action==='handoff_publish') publishHandoff(p,input); else if(input.action==='handoff_cancel') cancelHandoff(p,input); else if(input.action==='handoff_claim') handoffTool(next,'claim_handoff',input); else if (['bridge_apply','bridge_retry','bridge_cancel'].includes(input.action)) reviewJobAction(p,input); else { if(input.action==='dispatch' && p.handoffs?.some(h=>['offered','claimed'].includes(h.status))) throw new ValidationError('已有接续交接，请先领取或取消'); act(p, input.action, input); } invalidateJobs(p); invalidateHandoffs(p); }
       save(next); return send(200, projectView(p));
     }
     send(404, { error: '未找到该资源' });

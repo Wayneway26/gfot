@@ -7,7 +7,7 @@ const required = (value, label) => {
 };
 const now = () => new Date().toISOString();
 function event(p, message) { p.updatedAt = now(); p.history.unshift({ at: p.updatedAt, revision: p.revision, cycle: p.cycle, message }); }
-function requirementSnapshot(p) { return { revision: p.revision, goal: p.goal, criteria: p.criteria, baseline: p.baseline, scope: p.scope, constraints: p.constraints }; }
+function requirementSnapshot(p) { return { revision: p.revision, repo: p.repo, goal: p.goal, criteria: p.criteria, baseline: p.baseline, scope: p.scope, constraints: p.constraints }; }
 export function createProject(input) {
   const p = { id: randomUUID(), createdAt: now(), updatedAt: now(), revision: 1, cycle: 1,
     stage: 'implement', status: 'ready', blockedFrom: null, memories: [], runs: [], reviews: [], history: [],
@@ -27,9 +27,9 @@ export function act(p, action, input = {}) {
     event(p, '用户添加了一条项目记忆'); return p;
   }
   if (action === 'revise') {
-    const goal = required(input.goal, '目标'), criteria = required(input.criteria, '验收条件'), baseline = required(input.baseline, '代码基准');
+    const goal = required(input.goal, '目标'), criteria = required(input.criteria, '验收条件'), baseline = required(input.baseline, '代码基准'), repo = input.repo === undefined ? p.repo : required(input.repo, '仓库位置');
     if (p.status === 'cancelled') throw new ValidationError('已取消项目不能修改需求');
-    p.goal = goal; p.criteria = criteria; p.baseline = baseline; p.revision++; p.cycle++;
+    p.goal = goal; p.criteria = criteria; p.baseline = baseline; p.repo = repo; p.revision++; p.cycle++;
     p.requirements ||= []; p.requirements.push(requirementSnapshot(p)); delete p.acceptance;
     p.runs.forEach(r => r.stale = true); p.reviews.forEach(r => r.stale = true);
     p.memories.forEach(m => m.state = '待复核'); p.stage = 'implement'; p.status = 'ready'; p.blockedFrom = null;

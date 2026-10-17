@@ -1,3 +1,4 @@
+import { handoffView } from './handoff.mjs';
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { currentRun, act, ValidationError } from './domain.mjs';
 import { buildReviewBundle } from './review-bundle.mjs';
@@ -20,7 +21,7 @@ export function jobView(job) {
   const { bundle, claimToken, resultHash, ...rest } = job;
   return { ...rest, status:effectiveJobStatus(job), fileCount:bundle.manifest.length, manifest:bundle.manifest };
 }
-export function projectView(p) { return { ...p, reviewJobs:(p.reviewJobs || []).map(jobView) }; }
+export function projectView(p) { return { ...p, reviewJobs:(p.reviewJobs || []).map(jobView), handoffs:(p.handoffs || []).map(handoffView) }; }
 export function invalidateJobs(p) {
   for (const job of p.reviewJobs || []) {
     if (terminal.has(job.status)) continue;
