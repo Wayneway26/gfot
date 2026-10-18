@@ -7,15 +7,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const input = { title: 'HTTP integration fixture', goal: 'reject invalid input', repo: '/test/repo', baseline: 'abc', scope: 'login', criteria: 'tests pass', implementer: 'A', reviewer: 'B' };
 async function start(dir) {
- const child = spawn(process.execPath, ['server.mjs'], { env: { ...process.env, PORT: '0', AGENTSUMMARY_DATA_DIR: dir }, stdio: ['ignore', 'pipe', 'pipe'] });
+ const child = spawn(process.execPath, ['server.mjs'], { env: { ...process.env, PORT: '0', GFOT_DATA_DIR: dir }, stdio: ['ignore', 'pipe', 'pipe'] });
  const url = await new Promise((resolve, reject) => { let output = ''; const timer = setTimeout(() => { child.kill(); reject(Error('server startup timed out')); }, 5000); child.stdout.on('data', chunk => { output += chunk; const m = output.match(/http:\/\/127\.0\.0\.1:\d+/); if (m) { clearTimeout(timer); resolve(m[0]); } }); child.on('error', e => { clearTimeout(timer); reject(e); }); child.on('exit', code => { clearTimeout(timer); reject(Error(`server exited ${code}`)); }); });
  return { child, url };
 }
 async function stop(child) { if (child.exitCode !== null) return; await new Promise(resolve => { child.once('exit', resolve); child.kill(); }); }
 test('HTTP validation, persistence across restart, exports and cross-origin isolation', async () => {
- const dir = mkdtempSync(join(tmpdir(), 'agentsummary-test-')); let service;
+ const dir = mkdtempSync(join(tmpdir(), 'gfot-test-')); let service;
  try {
   service = await start(dir);
+  const html=await (await fetch(service.url+'/')).text();
+  assert.match(html, /<title>gfot<\/title>/);
+  assert.match(html, /aria-label="gfot 首页"/);
   const request = (path, body) => fetch(service.url + '/api/projects' + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
   assert.equal((await request('', {})).status, 400);
   let response = await request('', input); assert.equal(response.status, 200); const p = await response.json();
@@ -51,7 +54,7 @@ test('HTTP validation, persistence across restart, exports and cross-origin isol
 });
 
 test('UTF-8 characters split across request chunks survive saving and handoff', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agentsummary-utf8-'));
+  const dir = mkdtempSync(join(tmpdir(), 'gfot-utf8-'));
   let service;
   try {
     service = await start(dir);
@@ -94,7 +97,7 @@ test('UTF-8 characters split across request chunks survive saving and handoff', 
 });
 
 test('WorkBuddy authenticated API and real stdio MCP roundtrip survive restart', async()=>{
- const dir=mkdtempSync(join(tmpdir(),'agentsummary-bridge-'));let service;
+ const dir=mkdtempSync(join(tmpdir(),'gfot-bridge-'));let service;
  try{
   service=await start(dir);
   let token=readFileSync(join(dir,'bridge-token'),'utf8');
@@ -113,12 +116,14 @@ test('WorkBuddy authenticated API and real stdio MCP roundtrip survive restart',
   assert.ok(!JSON.stringify(visible).includes(c.claimToken));
   assert.ok(!JSON.stringify(visible).includes('export const add'));
   const configuration=await (await fetch(service.url+'/api/workbuddy/config')).json();
-  assert.ok(configuration.config.mcpServers.agentsummary.args.includes(join(dir,'bridge-token')));
+  assert.ok(configuration.config.mcpServers.gfot.args.includes(join(dir,'bridge-token')));
   assert.ok(!JSON.stringify(configuration).includes(token));
   const messages=[{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'integration-test',version:'1'}}},{jsonrpc:'2.0',method:'notifications/initialized'},{jsonrpc:'2.0',id:2,method:'tools/list'},{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'bridge_status',arguments:{}}}];
   const mcp=spawnSync(process.execPath,['scripts/workbuddy-mcp.mjs','--url',service.url,'--token-file',join(dir,'bridge-token')],{input:messages.map(m=>JSON.stringify(m)).join('\n')+'\n',encoding:'utf8',timeout:15000});
   assert.equal(mcp.status,0,mcp.stderr);
   const output=mcp.stdout.trim().split('\n').map(s=>JSON.parse(s));
+  assert.equal(output[0].result.serverInfo.name,'gfot-workbuddy');
+  assert.equal(JSON.parse(output[2].result.content[0].text).service,'gfot');
   assert.equal(output.length,3);assert.equal(output[1].result.tools.length,9);assert.ok(!output[2].result.isError);
   assert.equal(JSON.parse(output[2].result.content[0].text).scope,'仅用户发布的审查副本');
   await stop(service.child);service=await start(dir);

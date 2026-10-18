@@ -5,7 +5,7 @@ import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 async function start(dir){
- const child=spawn(process.execPath,['server.mjs'],{env:{...process.env,PORT:'0',AGENTSUMMARY_DATA_DIR:dir},stdio:['ignore','pipe','pipe']});
+ const child=spawn(process.execPath,['server.mjs'],{env:{...process.env,PORT:'0',GFOT_DATA_DIR:dir},stdio:['ignore','pipe','pipe']});
  const url=await new Promise((resolve,reject)=>{let output='',error='';const timer=setTimeout(()=>{child.kill();reject(Error('startup timeout'));},5000);child.stdout.on('data',b=>{output+=b;const m=output.match(/http:\/\/127\.0\.0\.1:\d+/);if(m){clearTimeout(timer);resolve(m[0]);}});child.stderr.on('data',b=>error+=b);child.on('error',e=>{clearTimeout(timer);reject(e);});child.on('exit',()=>{clearTimeout(timer);reject(Error(error||'server exited'));});});return {child,url};
 }
 const stop=child=>child.exitCode!==null?Promise.resolve():new Promise(resolve=>{child.once('exit',resolve);child.kill();});

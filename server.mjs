@@ -8,7 +8,7 @@ import { createProject, act, taskPack, delivery, ValidationError } from './domai
 import { buildReviewBundle } from './review-bundle.mjs';
 import { bridgeTool, publishReview, reviewJobAction, invalidateJobs, projectView } from './workbuddy-bridge.mjs';
 const root = fileURLToPath(new URL('.', import.meta.url));
-const dataDir = process.env.AGENTSUMMARY_DATA_DIR || join(root, 'data');
+const dataDir = process.env.GFOT_DATA_DIR || join(root, 'data');
 mkdirSync(dataDir, { recursive: true });
 const file = join(dataDir, 'projects.json');
 const tokenFile = join(dataDir, 'bridge-token');
@@ -36,7 +36,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(readFileSync(join(root, 'public', name)));
     }
     if (req.method === 'GET' && path === '/api/projects') return send(200, projects.map(projectView));
-    if (req.method === 'GET' && path === '/api/workbuddy/config') return send(200, { config:{mcpServers:{agentsummary:{type:'stdio',command:process.execPath,args:[join(root,'scripts/workbuddy-mcp.mjs'),'--url',`http://${host}`,'--token-file',tokenFile]}}}, scope:'仅用户主动发布的审查副本或接续交接；无文件系统、命令执行或最终验收工具', automaticPush:false });
+    if (req.method === 'GET' && path === '/api/workbuddy/config') return send(200, { config:{mcpServers:{gfot:{type:'stdio',command:process.execPath,args:[join(root,'scripts/workbuddy-mcp.mjs'),'--url',`http://${host}`,'--token-file',tokenFile]}}}, scope:'仅用户主动发布的审查副本或接续交接；无文件系统、命令执行或最终验收工具', automaticPush:false });
     if (req.method === 'POST' && path === '/api/bridge' && !bridgeAuthorized(req)) return send(401,{error:'桥接凭证无效'});
     const match = path.match(/^\/api\/projects\/([^/]+)(?:\/(pack|delivery|review-bundle|workbuddy))?$/);
     if (req.method === 'GET' && match && !['review-bundle','workbuddy'].includes(match[2])) {
@@ -75,4 +75,4 @@ const server = http.createServer(async (req, res) => {
     send(404, { error: '未找到该资源' });
   } catch (e) { if (!(e instanceof ValidationError)) console.error(e); send(e instanceof ValidationError ? 400 : 500, { error: e instanceof ValidationError ? e.message : '保存失败，请查看服务日志；原数据未被覆盖' }); }
 });
-server.listen(Number(process.env.PORT || 4317), '127.0.0.1', () => console.log(`AgentSummary → http://127.0.0.1:${server.address().port}`));
+server.listen(Number(process.env.PORT || 4317), '127.0.0.1', () => console.log(`gfot → http://127.0.0.1:${server.address().port}`));

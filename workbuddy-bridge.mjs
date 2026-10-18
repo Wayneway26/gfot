@@ -87,7 +87,7 @@ function findJob(projects, id) {
 }
 export function bridgeTool(projects, name, args = {}) {
   if(!args || typeof args!=='object' || Array.isArray(args)) throw new ValidationError('工具参数必须是对象');
-  if (name === 'bridge_status') return { service:'AgentSummary', transport:'stdio-to-localhost', scope:'仅用户发布的审查副本', automaticPush:false };
+  if (name === 'bridge_status') return { service:'gfot', transport:'stdio-to-localhost', scope:'仅用户发布的审查副本', automaticPush:false };
   if (name === 'list_review_jobs') return { jobs:projects.flatMap(p => (p.reviewJobs || []).filter(j => ['queued','reviewing','submitted'].includes(effectiveJobStatus(j)) && p.stage === 'review' && p.status === 'running' && p.revision === j.revision && p.cycle === j.cycle).map(j => ({ jobId:j.id, title:j.bundle.task.title, bundleId:j.bundleId, reviewedVersion:j.version, status:effectiveJobStatus(j), expiresAt:j.expiresAt }))) };
   if (!['get_review_job','submit_review'].includes(name)) throw new ValidationError('连接器不支持此工具');
   const { p, job } = findJob(projects, required(args.jobId, '派发 ID'));

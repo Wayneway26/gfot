@@ -22,7 +22,7 @@ if (typeof endpoint !== 'string' || !endpoint.startsWith('unix:///')) throw Erro
 const docker = (args, options) => spawnSync('docker', ['--host', endpoint, ...args], options);
 const check = docker(['image', 'inspect', image], { encoding: 'utf8', timeout: 15_000 });
 if (check.status !== 0) throw Error('Pinned Docker image unavailable. No host execution fallback. See README.');
-const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'agentsummary-isolated-')));
+const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'gfot-isolated-')));
 const source = join(scratch, 'source'); mkdirSync(source, { mode: 0o755 });
 try {
   for (const file of files) {
@@ -31,9 +31,9 @@ try {
   }
   const results = [];
   function run(label, command) {
-    const name = 'agentsummary-review-' + randomUUID();
+    const name = 'gfot-review-' + randomUUID();
     try {
-      const result = docker(['run', '--rm', '--name', name, '--pull=never', '--network=none', '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--pids-limit=128', '--memory=512m', '--cpus=1', '--user=1000:1000', '--mount', `type=bind,src=${source},dst=/review,readonly`, '--tmpfs', '/tmp:rw,nosuid,nodev,noexec,size=134217728,uid=1000,gid=1000', '--workdir=/review', '--env=TMPDIR=/tmp', '--env=AGENTSUMMARY_DATA_DIR=/tmp/agentsummary-data', '--env=npm_config_cache=/tmp/npm-cache', image, ...command], { encoding: 'utf8', timeout: 120_000, maxBuffer: 1_000_000 });
+      const result = docker(['run', '--rm', '--name', name, '--pull=never', '--network=none', '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--pids-limit=128', '--memory=512m', '--cpus=1', '--user=1000:1000', '--mount', `type=bind,src=${source},dst=/review,readonly`, '--tmpfs', '/tmp:rw,nosuid,nodev,noexec,size=134217728,uid=1000,gid=1000', '--workdir=/review', '--env=TMPDIR=/tmp', '--env=GFOT_DATA_DIR=/tmp/gfot-data', '--env=npm_config_cache=/tmp/npm-cache', image, ...command], { encoding: 'utf8', timeout: 120_000, maxBuffer: 1_000_000 });
       const ok = result.status === 0 && !result.error;
       results.push({ label, ok, exitCode: result.status, output: (result.stdout || '') + (result.stderr || ''), error: result.error?.message });
       console.log(`=== ${label}: ${ok ? 'PASS' : 'FAIL'} ===\n${results.at(-1).output}`);

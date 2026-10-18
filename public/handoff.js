@@ -23,7 +23,7 @@ export function continuationAction(name,p,{form,field,api,modal,download,toast})
     form('取消接续交接','<p class="note">旧领取凭证将失效，记录保留。请自行停止外部客户端中的任务。</p>','确认取消',()=>api('/'+p.id,{method:'POST',body:{action:name,handoffId:h.id}}));return;
   }
   if(name==='handoff_pack'){
-    const text=`请在 ${h.snapshot.to} 接续此任务。若已配置 AgentSummary MCP，调用 get_handoff，handoffId 为 ${h.id}；核对实际目录和版本后调用 claim_handoff。使用 save_checkpoint 保存进度，complete_handoff 交回实现。不要替用户审查通过或验收。\n\n若没有连接器，阅读下方材料、核对目录和版本，再请用户在工作台手工确认接手和录入结果。\n\n材料 SHA256：${h.digest}\n${JSON.stringify(h.snapshot,null,2)}\n\n最新回写（原始材料保持不变）：\n${JSON.stringify(h.latestCheckpoint,null,2)}\n\n接续不会迁移隐藏推理、正在运行的进程或客户端权限。`;
+    const text=`请在 ${h.snapshot.to} 接续此任务。若已配置 gfot MCP，调用 get_handoff，handoffId 为 ${h.id}；核对实际目录和版本后调用 claim_handoff。使用 save_checkpoint 保存进度，complete_handoff 交回实现。不要替用户审查通过或验收。\n\n若没有连接器，阅读下方材料、核对目录和版本，再请用户在工作台手工确认接手和录入结果。\n\n材料 SHA256：${h.digest}\n${JSON.stringify(h.snapshot,null,2)}\n\n最新回写（原始材料保持不变）：\n${JSON.stringify(h.latestCheckpoint,null,2)}\n\n接续不会迁移隐藏推理、正在运行的进程或客户端权限。`;
     modal('项目接续交接材料',`<pre class="pack-preview">${escape(text)}</pre><div class="actions"><button id="copy-handoff">复制交接材料</button><button id="download-handoff">下载 Markdown</button></div>`);
     document.querySelector('#copy-handoff').onclick=async()=>{try{await navigator.clipboard.writeText(text);toast('已复制');}catch{toast('请下载交接材料');}};
     document.querySelector('#download-handoff').onclick=()=>download('handoff-'+h.id+'.md',text);return;

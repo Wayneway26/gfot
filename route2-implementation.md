@@ -19,7 +19,7 @@
 
 **MCP 路径**：两端配置同一个本机 stdio 连接器。目标客户端调用 get_handoff、claim_handoff、save_checkpoint、complete_handoff。list_handoffs 只列出当前有效的已发布交接。连接配置页同时提供 WorkBuddy JSON 和 Codex TOML。更新配置时保留原有的其他服务。
 
-项目迁移到 /Users/wayne/gfot 后，原来的 WorkBuddy 配置仍可能指向已不存在的 /Users/wayne/AgentSummary；需要在配置页重新生成并由用户更新。旧任务的仓库路径可通过“编辑需求与版本”更正，这会开启新需求版本并使旧交接失效。
+项目目录迁移或连接器标识改名后，需要在配置页重新生成配置，并在客户端用新的 `gfot` 条目替换旧条目。旧任务的仓库路径可通过“编辑需求与版本”更正，这会开启新需求版本并使旧交接失效。
 
 ## 准确的边界
 

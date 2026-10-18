@@ -10,7 +10,7 @@ try {
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw Error('Only local 127.0.0.1 bridge URLs are allowed');
   token = readFileSync(option('--token-file'),'utf8').trim();
   if (!/^[a-f0-9]{64}$/.test(token)) throw Error('Invalid bridge credential');
-} catch { console.error('AgentSummary bridge configuration unavailable. Start the local workbench and regenerate connector settings.'); process.exit(1); }
+} catch { console.error('gfot bridge configuration unavailable. Start the local workbench and regenerate connector settings.'); process.exit(1); }
 let initialized = false;
 async function request(message) {
   const { id, method, params={} } = message;
@@ -20,7 +20,7 @@ async function request(message) {
   if (method === 'initialize') {
     initialized=true;
     const versions=['2025-06-18','2024-11-05'];
-    return {jsonrpc:'2.0',id,result:{protocolVersion:versions.includes(params.protocolVersion)?params.protocolVersion:versions[0],capabilities:{tools:{}},serverInfo:{name:'agentsummary-workbuddy',version:'0.2.0'},instructions:'只操作用户明确发布的审查副本或接续交接。审查使用 get_review_job/submit_review；接续使用 get_handoff/claim_handoff/save_checkpoint/complete_handoff。审查不得读取原目录；接续须遵守用户授权的目录和范围，不自动授予文件权限。最终验收由用户完成。'}};
+    return {jsonrpc:'2.0',id,result:{protocolVersion:versions.includes(params.protocolVersion)?params.protocolVersion:versions[0],capabilities:{tools:{}},serverInfo:{name:'gfot-workbuddy',version:'0.2.0'},instructions:'只操作用户明确发布的审查副本或接续交接。审查使用 get_review_job/submit_review；接续使用 get_handoff/claim_handoff/save_checkpoint/complete_handoff。审查不得读取原目录；接续须遵守用户授权的目录和范围，不自动授予文件权限。最终验收由用户完成。'}};
   }
   if (!initialized) return error(-32002,'Initialize first');
   if (method === 'ping') return {jsonrpc:'2.0',id,result:{}};

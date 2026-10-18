@@ -1,5 +1,7 @@
 
-# AgentSummary
+# gfot
+
+产品需求：[gfot PRD](gfot-prd.md)。
 
 一个本地运行的多 Agent 代码任务协作工作台。支持手工接力，以及通过本机 MCP 让 WorkBuddy 领取指定副本、返回审查结果。
 
@@ -34,7 +36,7 @@ npm start
 - 不读取仓库、运行 Agent、自动运行测试或探测外部状态；代码版本和证据由用户提供。字段完整不代表内容真实。
 - 工作台没有云端同步、遥测、外部字体或直接模型调用。WorkBuddy 接入复用用户在其客户端的登录；经用户发布的材料可能由 WorkBuddy 发送至其模型服务。
 - 本机单用户使用，避免同时启动多个服务写入同一个数据目录。不适合暴露到公网。
-- 可用 `AGENTSUMMARY_DATA_DIR=/absolute/path` 指定独立数据目录。
+- 可用 `GFOT_DATA_DIR=/absolute/path` 指定独立数据目录。
 
 ## 检查
 
@@ -100,7 +102,7 @@ node scripts/isolated-check.mjs trials/isolation-002/review-copy-v2.md
 使用 WorkBuddy 官方支持的 [stdio 自定义连接器](https://open.workbuddy.cn/docs/connector)。不依赖模拟点击来传递任务，也不使用其内部 CLI 或私有接口。
 
 1. 保持 `npm start` 运行。在页面点击“WorkBuddy 连接配置”（窄屏为页头“WorkBuddy 连接”），下载配置。
-2. WorkBuddy → 专家·技能·连接器 → 连接器 → 自定义连接器 → 添加 MCP，将生成的 `agentsummary` 条目合入现有 `mcpServers`，保留其他服务。首次使用需要在 WorkBuddy 确认信任并启用。
+2. WorkBuddy → 专家·技能·连接器 → 连接器 → 自定义连接器 → 添加 MCP，将生成的 `gfot` 条目合入现有 `mcpServers`，保留其他服务。首次使用需要在 WorkBuddy 确认信任并启用。
 3. 在审查阶段准备副本、核对全部内容、确认版本，勾选本次授权后点击“发布到 WorkBuddy 队列”。仅发布会将这份源码快照保存在本机队列；普通下载仍不保存源码。
 4. 复制领取指令到 WorkBuddy 的新任务。发布不会自动唤醒 WorkBuddy；客户端必须主动调用工具。桥接只支持静态副本审查，命令检查仍使用独立容器检查器。
 5. WorkBuddy 调用 `get_review_job` 后页面显示“已领取”，调用 `submit_review` 后页面自动接收。这个状态只表示工具调用事实，不表示测试或审查质量已被验证。
@@ -117,3 +119,9 @@ node scripts/isolated-check.mjs trials/isolation-002/review-copy-v2.md
 实现阶段的“切换执行端”保存交接检查点和有效记忆。先停止旧客户端，核对材料并授权发布，再由目标端核对同一目录与代码版本、领取任务。可以使用 MCP 回写进度，或复制交接包并在页面手工确认接手、录入结果。完成实现后仍需独立审查与用户验收。
 
 接续不会自动唤起客户端、停止进程、读取仓库或迁移客户端内部状态；名称与版本是接手方自报。目录改名后需更新连接器配置；旧任务目录可通过“编辑需求与版本”更新。完整能力与限制见 [工程决策](route2-implementation.md)。
+
+## 命名与历史证据
+
+当前产品、包名与连接器标识均为 `gfot`，独立数据目录使用 `GFOT_DATA_DIR`。客户端连接配置请从页面重新生成，以 `gfot` 条目替换此前的服务条目。
+
+`trials/` 保存当时的原始审查输入、哈希、日志与回执，内部历史名称原样保留，不将旧证据改写为新版本验证。旧界面预览位于 `trials/ui-before-rename/`。
