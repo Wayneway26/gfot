@@ -5,10 +5,11 @@ import {join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createStore,publicState,newTask,profileInput,vault,requireText,InputError} from './state.mjs';
 import {OpenCodeEngine} from './engine.mjs';
+import {listModels,verifyConnection} from './connections.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
 const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
-export async function startDesktopServer({dataDir,binary,key,engineFactory=options=>new OpenCodeEngine(options)}){
+export async function startDesktopServer({dataDir,binary,key,connectionFetch=fetch,engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;
  const state=storage.state;
  const safe=value=>{
@@ -74,14 +75,26 @@ export async function startDesktopServer({dataDir,binary,key,engineFactory=optio
    if(path==='/api/profiles'){
     if(active.size)throw new InputError('请先停止执行，再修改连接设置');
     const existing=input.id?state.profiles.find(p=>p.id===input.id):undefined;if(input.id&&!existing)throw new InputError('连接不存在');
-    const profile=profileInput(input,existing,secrets.seal);if(existing)Object.assign(existing,profile);else state.profiles.push(profile);storage.save();changed();return send(200,view());
+    const profile=profileInput(input,existing,secrets.seal);if(existing){delete existing.verification;Object.assign(existing,profile);}else state.profiles.push(profile);storage.save();changed();return send(200,view());
    }
-   if(path==='/api/profiles/test'){
+   if(path==='/api/connections/models'){
+    const existing=input.id?state.profiles.find(p=>p.id===input.id):undefined;if(input.id&&!existing)throw new InputError('连接不存在');
+    const profile=profileInput({...input,model:input.model||'model-list-only'},existing,secrets.seal);
+    return send(200,await listModels(profile,secrets.open(profile.secret),connectionFetch));
+   }
+   if(path==='/api/profiles/test'||path==='/api/profiles/verify'){
     const profile=state.profiles.find(p=>p.id===input.id);if(!profile)throw new InputError('请先保存连接');
-    const response=await fetch(profile.baseURL+'/models',{headers:{Authorization:'Bearer '+(secrets.open(profile.secret)||'local-proxy')},signal:AbortSignal.timeout(8000),redirect:'error'});
-    if(!response.ok)throw new InputError('代理模型列表请求失败（'+response.status+'）');
-    const result=await response.json();const models=Array.isArray(result.data)?result.data.map(m=>m.id).filter(id=>typeof id==='string'):[];
-    return send(200,{reachable:true,modelListed:models.includes(profile.model),models:models.slice(0,100),note:'模型列表可达不代表已验证模型推理、额度或工具调用。'});
+    if(path.endsWith('/test'))return send(200,await listModels(profile,secrets.open(profile.secret),connectionFetch));
+    if(input.consent!==true)throw new InputError('请先确认：此检查会发送固定诊断消息并可能消耗模型用量，不会读取项目文件');
+    const snapshot=JSON.stringify(profile),target=structuredClone(profile),targetKey=secrets.open(target.secret);
+    let result;
+    try{result=await verifyConnection(target,targetKey,connectionFetch);}catch(error){
+     if(JSON.stringify(state.profiles.find(p=>p.id===input.id))===snapshot){profile.verification={at:new Date().toISOString(),inference:false,toolCalling:false};storage.save();changed();}
+     throw error;
+    }
+    if(JSON.stringify(state.profiles.find(p=>p.id===input.id))!==snapshot)throw new InputError('检查期间连接已改变，请重新检查');
+    profile.verification={at:new Date().toISOString(),inference:result.inference,toolCalling:result.toolCalling};storage.save();changed();
+    return send(200,result);
    }
    if(path==='/api/tasks'){
     let folder;try{folder=realpathSync(requireText(input.folder,'项目目录',4096));if(!statSync(folder).isDirectory())throw Error();}catch{throw new InputError('项目目录不存在或不可访问');}
@@ -100,7 +113,7 @@ export async function startDesktopServer({dataDir,binary,key,engineFactory=optio
    if(match[2]==='permission'){if(pending.kind!=='permission'||!['once','reject'].includes(input.reply))throw new InputError('请选择批准一次或拒绝');await runtime.engine.permission(input.id,input.reply);}
    else{if(pending.kind!=='question'||!Array.isArray(input.answers)||!input.answers.every(a=>Array.isArray(a)&&a.every(s=>typeof s==='string')))throw new InputError('请回答问题');await runtime.engine.question(input.id,input.answers);}
    task.pending=task.pending.filter(p=>p.id!==input.id);task.status=task.pending.length?'permission':'running';changed();return send(200,{ok:true});
-  }catch(error){send(error instanceof InputError?400:500,{error:error instanceof InputError?error.message:'操作失败：请检查本地连接和执行器状态'});}
+  }catch(error){send(error instanceof InputError?400:500,{error:error instanceof InputError?error.message:'操作失败：请检查连接和执行器状态'});}
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});origin='http://127.0.0.1:'+server.address().port;
  return {url:origin,auth,state,close:async()=>{closed=true;clearTimeout(timer);await Promise.all(Array.from(active.values(),async runtime=>{runtime.cancelled=true;await runtime.engine.stop();}));await Promise.allSettled(pendingRuns);storage.save();for(const client of clients)client.end();await new Promise(resolve=>server.close(resolve));}};

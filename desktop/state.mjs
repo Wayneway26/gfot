@@ -4,9 +4,18 @@ import {join,isAbsolute} from 'node:path';
 export class InputError extends Error {}
 export const requireText=(value,name,max=30000)=>{if(typeof value!=='string'||!value.trim()||value.length>max)throw new InputError(`请填写${name}`);return value.trim();};
 export function profileInput(input,existing,seal){
- let url;try{url=new URL(requireText(input.baseURL,'本地代理地址'));}catch{throw new InputError('请填写有效的本地代理地址');}
- if(url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname)||url.username||url.password||url.search||url.hash)throw new InputError('首版仅连接本机 HTTP 模型代理，例如 http://127.0.0.1:15721/v1');
- return {id:existing?.id||randomUUID(),label:requireText(input.label,'连接名称',80),baseURL:url.toString().replace(/\/$/,''),model:requireText(input.model,'模型 ID',160),secret:input.apiKey?seal(requireText(input.apiKey,'本地代理访问密钥',4096)):existing?.secret||null};
+ let url;try{url=new URL(requireText(input.baseURL,'服务地址'));}catch{throw new InputError('请填写有效的服务地址');}
+ const mode=input.mode||existing?.mode||'local';
+ if(!['local','direct'].includes(mode))throw new InputError('请选择本机服务或 HTTPS API 直连');
+ if(url.username||url.password||url.search||url.hash)throw new InputError('服务地址不能包含账号、密码、查询参数或片段');
+ if(mode==='local'&&(url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname)))throw new InputError('本机模式仅连接回环 HTTP 地址；远程服务请选择 HTTPS API 直连');
+ if(mode==='direct'&&url.protocol!=='https:')throw new InputError('API 直连必须使用 HTTPS，不能明文发送访问密钥');
+ if(existing?.secret&&!input.apiKey&&!input.clearKey&&new URL(existing.baseURL).origin!==url.origin)throw new InputError('更改服务地址后，请重新输入该服务的访问密钥，或选择清除旧密钥');
+ const secret=input.apiKey?seal(requireText(input.apiKey,'访问密钥',4096)):input.clearKey?null:existing?.secret||null;
+ if(mode==='direct'&&!secret)throw new InputError('请填写该服务的 API Key（订阅登录 Token 不等于 API Key）');
+ const profile={id:existing?.id||randomUUID(),label:requireText(input.label,'连接名称',80),mode,baseURL:url.toString().replace(/\/$/,''),model:requireText(input.model,'模型 ID',160),secret};
+ if(existing?.verification&&['mode','baseURL','model','secret'].every(k=>(existing[k]??(k==='mode'?'local':null))===profile[k]))profile.verification=existing.verification;
+ return profile;
 }
 export function vault(key){
  if(!Buffer.isBuffer(key)||key.length!==32)throw Error('Missing desktop vault key');

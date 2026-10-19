@@ -8,16 +8,48 @@ function toast(text){$('#toast').textContent=text;$('#toast').style.display='blo
 function modal(title,description,content,submit,onSubmit){
  $('#dialog-body').innerHTML=`<h2>${escape(title)}</h2><p>${escape(description)}</p><form id="modal-form">${content}<div id="dialog-error" role="alert"></div><div class="actions"><button type="button" id="modal-close">取消</button><button class="primary" type="submit">${escape(submit)}</button></div></form>`;
  if(!$('#dialog').open)$('#dialog').showModal();$('#modal-close').onclick=()=>$('#dialog').close();
- $('#modal-form').onsubmit=async event=>{event.preventDefault();const button=event.target.querySelector('button[type=submit]');button.disabled=true;try{await onSubmit(Object.fromEntries(new FormData(event.target)));}catch(error){$('#dialog-error').textContent=error.message;}finally{button.disabled=false;}};
+ $('#modal-form').onsubmit=async event=>{event.preventDefault();const button=event.target.querySelector('button[type=submit]');button.disabled=true;try{await onSubmit(Object.fromEntries(new FormData(event.target)),event.target);}catch(error){if(event.target.isConnected)$('#dialog-error').textContent=error.message;}finally{button.disabled=false;}};
 }
 function field(name,label,value='',type='text',placeholder=''){return `<label>${escape(label)}<input name="${name}" type="${type}" value="${escape(value)}" placeholder="${escape(placeholder)}" ${type==='password'?'autocomplete="new-password"':'required'}></label>`;}
+const presets={
+ custom:{label:'自定义 HTTPS API',mode:'direct',baseURL:'',model:''},
+ deepseek:{label:'DeepSeek API',mode:'direct',baseURL:'https://api.deepseek.com',model:''},
+ ollama:{label:'本机 Ollama',mode:'local',baseURL:'http://127.0.0.1:11434/v1',model:''},
+ proxy:{label:'本机模型代理',mode:'local',baseURL:'http://127.0.0.1:8080/v1',model:''},
+};
 function editProfile(profile,after){
- modal(profile?'编辑模型连接':'连接本地模型代理','使用 CC Switch 或其他本机 OpenAI 兼容代理。真实上游账号由代理管理；这里不读取你的 Agent 凭证文件。',field('label','连接名称',profile?.label||'我的模型代理')+field('baseURL','本地代理地址',profile?.baseURL||'http://127.0.0.1:15721/v1')+field('model','实际模型 ID',profile?.model||'','text','填写代理支持的模型 ID')+field('apiKey',profile?.hasKey?'代理密钥（留空保留，使用 macOS 钥匙串保护）':'本地代理访问密钥（如代理不要求可留空）','','password'),'保存连接',async values=>{state=await api('profiles',{...values,...(profile?{id:profile.id}:{})});$('#dialog').close();render();if(after)await after();});
+ const mode=profile?.mode||'local';
+ modal(profile?'编辑模型连接':'连接你的模型','支持 OpenAI Chat Completions 兼容服务。API 直连无需另外安装代理；API Key 与订阅登录凭证不同。',
+ `<label>快速填写<select id="connection-preset"><option value="existing">${profile?'保留当前配置':'选择服务…'}</option>${Object.entries(presets).map(([id,p])=>`<option value="${id}">${escape(p.label)}</option>`).join('')}</select></label>`+
+ `<label>连接方式<select name="mode"><option value="local" ${mode==='local'?'selected':''}>本机服务（HTTP 回环地址）</option><option value="direct" ${mode==='direct'?'selected':''}>HTTPS API 直连（使用自己的 API Key）</option></select></label>`+
+ field('label','连接名称',profile?.label||'我的模型')+field('baseURL','Base URL',profile?.baseURL||'','url','如 https://your-service.example/v1')+
+ field('apiKey',profile?.hasKey?'访问密钥（留空保留，钥匙串保护）':'API Key（本机服务不要求时可留空）','','password')+
+ (profile?.hasKey?'<label class="check"><input type="checkbox" name="clearKey" value="yes">清除旧密钥（HTTPS 直连需重新填写）</label>':'')+
+ `<div class="model-discovery"><button id="load-models" type="button">读取模型列表</button><span id="model-discovery-note">也可以手动填写模型 ID</span></div>`+
+ field('model','模型 ID',profile?.model||'','text','选择支持工具调用的模型')+'<datalist id="available-models"></datalist>',
+ '保存连接',async(values,form)=>{state=await api('profiles',{...values,clearKey:values.clearKey==='yes',...(profile?{id:profile.id}:{})});render();if(form.isConnected&&$('#modal-form')===form){$('#dialog').close();if(after)await after();}});
+ const form=$('#modal-form'),model=form.elements.model;model.setAttribute('list','available-models');
+ $('#connection-preset').onchange=event=>{const p=presets[event.target.value];if(!p)return;for(const field of ['mode','label','baseURL','model'])form.elements[field].value=p[field];form.elements.apiKey.value='';if(form.elements.clearKey)form.elements.clearKey.checked=true;$('#available-models').innerHTML='';$('#model-discovery-note').textContent='请填写此服务的密钥，再读取模型列表';};
+ $('#load-models').onclick=async event=>{const button=event.target;button.disabled=true;$('#dialog-error').textContent='';try{
+  const values=Object.fromEntries(new FormData(form)),snapshot=JSON.stringify(values);const result=await api('connections/models',{...values,clearKey:values.clearKey==='yes',...(profile?{id:profile.id}:{})});
+  if(!form.isConnected||$('#modal-form')!==form)return;if(JSON.stringify(Object.fromEntries(new FormData(form)))!==snapshot){$('#model-discovery-note').textContent='配置已变化，请重新读取模型列表';return;}
+  $('#available-models').innerHTML=result.models.map(id=>`<option value="${escape(id)}"></option>`).join('');
+  if(!model.value&&result.models.length===1)model.value=result.models[0];
+  $('#model-discovery-note').textContent=result.models.length?'找到 '+result.models.length+' 个模型，点击模型输入框选择':'模型列表为空；请先在服务端准备模型';model.focus();
+ }catch(error){if(form.isConnected&&$('#modal-form')===form)$('#dialog-error').textContent=error.message;}finally{button.disabled=false;}};
 }
 function settings(){
- $('#dialog-body').innerHTML=`<h2>模型连接</h2><p>切换连接在下一回合生效。首版不查询订阅额度，也不自动故障切换。</p>${state.profiles.map(p=>`<div class="profile-row"><div>${escape(p.label)}<small>${escape(p.model)} · ${escape(p.baseURL)}</small></div><div><button data-test-profile="${p.id}">检查连接</button> <button data-edit-profile="${p.id}">编辑</button></div></div>`).join('')||'<p>尚未配置本地模型代理。</p>'}<div class="actions"><button id="settings-close">关闭</button><button class="primary" id="add-profile">添加连接</button></div>`;
+ $('#dialog-body').innerHTML=`<h2>模型连接</h2><p>可直连自己的 HTTPS API，也可连接本机代理或 Ollama。切换在下一回合生效。</p>${state.profiles.map(p=>`<div class="profile-row"><div>${escape(p.label)}<small>${p.mode==='direct'?'HTTPS API':'本机服务'} · ${escape(p.model)}</small><small>${p.verification?.toolCalling?'✓ 推理与工具回传已检查（'+escape(new Date(p.verification.at).toLocaleDateString())+'）':'尚未完成推理与工具检查'}</small></div><div><button data-verify-profile="${p.id}">验证可用性</button> <button data-edit-profile="${p.id}">编辑</button></div></div>`).join('')||'<p>先添加一个模型连接；密钥仅在本机加密保存。</p>'}<div class="actions"><button id="settings-close">关闭</button><button class="primary" id="add-profile">添加连接</button></div>`;
  if(!$('#dialog').open)$('#dialog').showModal();$('#settings-close').onclick=()=>$('#dialog').close();$('#add-profile').onclick=()=>editProfile();
 }
+function verifyProfile(profile){
+ modal('验证模型是否可用','检查会向所选服务发送最多两次固定诊断请求，可能消耗你的模型用量。不会读取项目、执行命令或修改文件。',`<p><strong>${escape(profile.label)}</strong> · ${escape(profile.model)}<br>${escape(profile.baseURL)}</p><label class="check"><input type="checkbox" required>我同意发送诊断消息并使用该服务的模型额度</label><div id="verification-result" role="status"></div>`,'开始检查',async(_values,form)=>{
+  $('#verification-result').textContent='正在检查模型推理、工具调用与结果回传…';
+  const result=await api('profiles/verify',{id:profile.id,consent:true});state=await api('state');if(!form.isConnected||$('#modal-form')!==form)return;
+  $('#verification-result').textContent=result.note;$('#modal-form button[type=submit]').textContent='重新检查';render();
+ });
+}
+
 async function createTask(){
  if(!state.profiles.length)return editProfile(null,createTask);
  let folder='';if(window.gfotDesktop){folder=await window.gfotDesktop.chooseFolder();if(!folder)return;}
@@ -42,6 +74,6 @@ $('#composer').onsubmit=async event=>{event.preventDefault();const text=$('#prom
 $('#prompt').onkeydown=event=>{if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();$('#composer').requestSubmit();}};
 $('#stop').onclick=()=>api('tasks/'+selected+'/stop',{}).catch(e=>toast(e.message));
 document.addEventListener('keydown',event=>{if(event.metaKey&&event.key==='n'){event.preventDefault();void createTask();}});
-document.addEventListener('click',async event=>{const t=event.target.closest('[data-task]');if(t){selected=t.dataset.task;localStorage.setItem('gfot-task',selected);render();return;}const edit=event.target.closest('[data-edit-profile]');if(edit)return editProfile(state.profiles.find(p=>p.id===edit.dataset.editProfile));const test=event.target.closest('[data-test-profile]');if(test){test.disabled=true;try{const result=await api('profiles/test',{id:test.dataset.testProfile});toast(result.modelListed?'代理可达，模型在列表中；推理与工具调用尚需实际验证。':'代理可达，模型未在列表中。请核对模型 ID。');}catch(e){toast(e.message);}finally{test.disabled=false;}return;}const p=event.target.closest('[data-permission]');if(p){p.disabled=true;try{await api('tasks/'+selected+'/permission',{id:p.dataset.permission,reply:p.dataset.reply});}catch(e){toast(e.message);}finally{p.disabled=false;}return;}});
+document.addEventListener('click',async event=>{const t=event.target.closest('[data-task]');if(t){selected=t.dataset.task;localStorage.setItem('gfot-task',selected);render();return;}const edit=event.target.closest('[data-edit-profile]');if(edit)return editProfile(state.profiles.find(p=>p.id===edit.dataset.editProfile));const verify=event.target.closest('[data-verify-profile]');if(verify)return verifyProfile(state.profiles.find(p=>p.id===verify.dataset.verifyProfile));const test=event.target.closest('[data-test-profile]');if(test){test.disabled=true;try{const result=await api('profiles/test',{id:test.dataset.testProfile});toast(result.modelListed?'代理可达，模型在列表中；推理与工具调用尚需实际验证。':'代理可达，模型未在列表中。请核对模型 ID。');}catch(e){toast(e.message);}finally{test.disabled=false;}return;}const p=event.target.closest('[data-permission]');if(p){p.disabled=true;try{await api('tasks/'+selected+'/permission',{id:p.dataset.permission,reply:p.dataset.reply});}catch(e){toast(e.message);}finally{p.disabled=false;}return;}});
 document.addEventListener('submit',async event=>{if(!event.target.matches('.question-form'))return;event.preventDefault();try{const values=Object.values(Object.fromEntries(new FormData(event.target)));await api('tasks/'+selected+'/question',{id:event.target.dataset.question,answers:values.map(v=>[v])});}catch(e){toast(e.message);}});
 try{state=await api('state');render();const events=new EventSource('/api/events');events.addEventListener('state',event=>{state=JSON.parse(event.data);render();});events.onerror=()=>{$('#status').textContent='本地服务连接中断';};}catch(error){toast('加载失败：'+error.message);}
