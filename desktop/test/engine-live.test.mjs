@@ -27,6 +27,6 @@ test('real bundled OpenCode + synthetic local model: asks permission, writes a f
  await call('tasks/'+taskId+'/prompt',{text:'Continue the same conversation with the new model.'});
  for(let i=0;i<500;i++){if(['idle','error','stopped'].includes(service.state.tasks[0].status))break;await sleep(100);}
  const resumed=service.state.tasks[0];assert.equal(resumed.status,'idle',resumed.error);assert.equal(resumed.sessionId,sessionId);assert.ok(resumed.messages.length>previousCount);assert.ok(models.includes('gfot-next'),'switched model must reach gateway');
- 
+
  }finally{await service?.close();await new Promise(r=>gateway.close(r));rmSync(dir,{recursive:true,force:true});}
 });
