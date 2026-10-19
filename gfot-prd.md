@@ -1,5 +1,7 @@
 # gfot PRD
 
+> 历史工作台规格。2026-10-20 起的 macOS 桌面预览版范围见 [docs/desktop-preview.md](docs/desktop-preview.md)，不要将本文的交接功能视为桌面版已集成能力。
+
 版本：v0.2  
 状态：MVP 定义稿，待接入验证与用户试用  
 更新日期：2026-10-16

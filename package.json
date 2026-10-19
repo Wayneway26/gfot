@@ -1,14 +1,29 @@
 {
   "name": "gfot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test test/*.test.mjs",
-    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js && node --check review-snapshot.mjs && node --check scripts/isolated-check.mjs && node --check workbuddy-bridge.mjs && node --check bridge-tools.mjs && node --check scripts/workbuddy-mcp.mjs && node --check public/workbuddy.js && node --check handoff.mjs && node --check handoff-tools.mjs && node --check public/handoff.js"
+    "test": "node --test test/*.test.mjs desktop/test/*.test.mjs",
+    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js && node --check review-snapshot.mjs && node --check scripts/isolated-check.mjs && node --check workbuddy-bridge.mjs && node --check bridge-tools.mjs && node --check scripts/workbuddy-mcp.mjs && node --check public/workbuddy.js && node --check handoff.mjs && node --check handoff-tools.mjs && node --check public/handoff.js && node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/worker.mjs && node --check desktop/backend.mjs && node --check desktop/engine.mjs && node --check desktop/ui/app.js",
+    "desktop": "electron desktop/main.cjs",
+    "dist:mac": "electron-builder --config desktop/builder.cjs --mac zip --arm64",
+    "test:desktop": "node --test desktop/test/*.test.mjs",
+    "test:ui": "electron desktop/test/ui-smoke.cjs"
   },
   "engines": {
     "node": ">=22"
+  },
+  "description": "A local-first macOS workspace for AI coding tasks",
+  "author": "Wayneway26",
+  "license": "Apache-2.0",
+  "main": "desktop/main.cjs",
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3"
+  },
+  "dependencies": {
+    "opencode-ai": "1.19.3"
   }
 }
