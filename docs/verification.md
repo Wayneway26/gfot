@@ -41,3 +41,9 @@ Harness² runtime integration is absent; README now documents the current archit
 - Anthropic model discovery uses its native key/version headers.
 
 All 76 automated tests pass. Real provider credentials were not used by these automated tests. A separate, explicitly authorized real Codex diagnostic passed; see accounts.md. The account UI labels the implementation experimental. See [accounts.md](accounts.md) for exact endpoints, implemented scope and pending real-account validation.
+
+## 0.4.1 presentation update
+
+The README header no longer includes a platform label. The desktop UI removes the macOS / local-first header and storage tagline, and names its settings entry Agent selection. The selection panel still identifies OpenCode as the current executor. This patch changes presentation, not Agent integration scope.
+
+For 0.4.1, syntax checks and the packaged native UI smoke passed again, including two synthetic-model OpenCode turns. The README screenshot was recaptured from that packaged app. The existing 76-test functional suite was last rerun successfully before this presentation-only patch.

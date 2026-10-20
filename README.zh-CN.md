@@ -9,7 +9,7 @@ One desktop workspace for your AI coding connections.
 
 [English](README.md) · **简体中文**
 
-![Preview](https://img.shields.io/badge/preview-v0.4.0-2862F5?style=flat-square)
+![Preview](https://img.shields.io/badge/preview-v0.4.1-2862F5?style=flat-square)
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
@@ -66,7 +66,7 @@ npm run desktop
 
 ### 创建第一个任务
 
-1. 打开 **模型连接**，添加账号、API 或本机服务。
+1. 打开 **Agent 选择**，添加账号、API 或本机服务。
 2. 读取模型目录并保存连接。可选的 **验证可用性** 会在你确认后发送最多两次固定诊断请求，不读取项目文件；Anthropic 连接目前需要通过实际任务验证执行。
 3. 新建任务，选择本地目录，描述目标。确认需要的文件修改和命令后再批准。
 4. 如需更换模型或账号，先结束或停止当前回合，再选择另一个连接继续。

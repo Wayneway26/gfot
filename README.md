@@ -9,7 +9,7 @@ One client. Your local projects, accounts and model connections.
 
 **English** · [简体中文](README.zh-CN.md)
 
-![Preview](https://img.shields.io/badge/preview-v0.4.0-2862F5?style=flat-square)
+![Preview](https://img.shields.io/badge/preview-v0.4.1-2862F5?style=flat-square)
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
@@ -68,7 +68,7 @@ npm run desktop
 
 ### Start your first task
 
-1. Open **模型连接** (Model connections) and add an account, API or local service.
+1. Open **Agent 选择** (Agent selection) and add an account, API or local service.
 2. Read the model directory and save a connection. The optional **验证可用性** check sends up to two fixed diagnostic requests after confirmation, without reading your project. Anthropic connections currently require an actual task to verify execution.
 3. Create a task, choose a local folder and describe the work. Review requested edits and commands before approving them.
 4. To change models or accounts, finish or stop the current turn, then select another connection and continue.
