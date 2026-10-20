@@ -15,7 +15,7 @@ function masterKey(dir){
 function trusted(event){if(!base||event.sender!==window?.webContents||!event.senderFrame?.url.startsWith(base+'/'))throw Error('Untrusted frame');}
 ipcMain.handle('gfot:folder',async event=>{trusted(event);const result=await dialog.showOpenDialog(window,{title:'选择项目目录',properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0];});
 function createWindow(){
- window=new BrowserWindow({width:1240,height:820,minWidth:840,minHeight:600,title:'gfot',backgroundColor:'#f8f9f6',titleBarStyle:'hiddenInset',trafficLightPosition:{x:20,y:20},webPreferences:{preload:join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ window=new BrowserWindow({width:1240,height:820,minWidth:840,minHeight:600,title:'gfot',backgroundColor:'#ffffff',titleBarStyle:'hiddenInset',trafficLightPosition:{x:20,y:20},webPreferences:{preload:join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
  window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
  window.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith(base+'/'))event.preventDefault();});
  window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
