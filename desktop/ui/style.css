@@ -128,3 +128,5 @@ input[type=checkbox]{accent-color:var(--accent)}
 dialog .primary{box-shadow:none}
 
 .account-entry{display:flex;gap:8px;margin:18px 0}.account-entry button{font-size:11px}.account-actions{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;max-width:150px}.connection-title{font-size:13px;margin:26px 0 5px}.account-row>div:first-child{max-width:300px}.account-row strong{font-weight:550}.account-actions button{padding:5px 8px}#account-model-note{font-size:10px;color:var(--muted);display:block;margin-top:8px}
+
+#h2-report{border:1px solid #dbe6fb;border-radius:10px;padding:12px;margin-bottom:18px;background:#f7faff;font-size:11px}#h2-report h3{margin:0 0 8px;color:#245fe8}#h2-report p{margin:7px 0;line-height:1.6}#h2-report pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto}#h2-report button{margin-top:8px}#h2-optimize{font-size:10px;padding:5px 8px;white-space:nowrap}

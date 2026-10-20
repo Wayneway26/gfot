@@ -5,13 +5,14 @@ import {join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createStore,publicState,newTask,profileInput,vault,requireText,InputError} from './state.mjs';
 import {OpenCodeEngine} from './engine.mjs';
+import {Harness2Engine,harnessStatus,harnessPrompt,validHarness} from './harness2.mjs';
 import {listModels,verifyConnection} from './connections.mjs';
 import {createAccountManager} from './accounts.mjs';
 import {startAccountProxy,verifyResponses} from './account-proxy.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
 const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
-export async function startDesktopServer({dataDir,binary,key,connectionFetch=fetch,accountFetch=fetch,engineFactory=options=>new OpenCodeEngine(options)}){
+export async function startDesktopServer({dataDir,binary,key,harnessRunner,connectionFetch=fetch,accountFetch=fetch,engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;
  const state=storage.state;
  const accounts=createAccountManager({state,vault:secrets,save:storage.save,changed:()=>changed(),credentialsChanged:id=>{accountProxy.revokeAccount(id);for(const p of state.profiles)if(p.accountId===id)delete p.verification;},fetchImpl:accountFetch});
@@ -21,11 +22,11 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
   const redact=v=>typeof v==='string'?values.reduce((text,secret)=>text.split(secret).join('[redacted]'),v):Array.isArray(v)?v.map(redact):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,item])=>[k,redact(item)])):v;
   return redact(value);
  };
- const view=()=>({...publicState(state),engine:{name:'OpenCode',bundled:!!binary,version:'1.19.3'},harness2:{enabled:false,reason:'首版为普通执行；递归改进尚未集成'},capabilities:{automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
+ const view=()=>({...publicState(state),engine:{name:'OpenCode',bundled:!!binary,version:'1.19.3'},harness2:{integrated:true,...harnessStatus(harnessRunner)},capabilities:{automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
  function changed(){if(closed)return;for(const client of clients)client.write('event: state\ndata: '+JSON.stringify(view())+'\n\n');clearTimeout(timer);timer=setTimeout(storage.save,80);}
  function addEvent(task,event){task.events.push({...event,at:new Date().toISOString()});task.events=task.events.slice(-150);changed();}
  function onEvent(task,event){
-  const raw=event.properties||{};if(raw.sessionID&&task.sessionId&&raw.sessionID!==task.sessionId)return;
+  const raw=event.properties||{};if(!active.get(task.id)?.harness2&&raw.sessionID&&task.sessionId&&raw.sessionID!==task.sessionId)return;
   const properties=safe(raw);for(const field of ['id','sessionID'])if(raw[field]!==undefined)properties[field]=raw[field];
   if(properties.part)for(const field of ['id','messageID','sessionID'])if(raw.part[field]!==undefined)properties.part[field]=raw.part[field];
   const draft=value=>{
@@ -48,7 +49,7 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
   try{
    if(profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
-   const engine=runtime.engine=engineFactory({binary,dataDir,task,profile:resolved,key:grant?.key||secrets.open(profile.secret),onEvent:event=>onEvent(task,event)});
+   const engine=runtime.engine=engineFactory({binary,dataDir,task,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event)});
    await engine.start();if(runtime.cancelled)return;
    task.status='running';storage.save();changed();
    const answer=await engine.send(text);if(runtime.cancelled)return;
@@ -58,6 +59,22 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
    task.error=null;addEvent(task,{type:'done',text:'本轮执行已结束，请检查实际变更与验证结果。'});
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);addEvent(task,{type:'error',text:task.error});}}
   finally{clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();task.status=runtime.cancelled?'stopped':finalStatus;task.pending=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
+ }
+ async function runHarness(task,text,profile){
+  const runtime={engine:null,cancelled:false,harness2:true};let grant,finalStatus='idle';active.set(task.id,runtime);
+  task.harnessRun={status:'running',runId:randomUUID(),startedAt:new Date().toISOString(),phases:[]};
+  const deadline=setTimeout(()=>{runtime.cancelled=true;void runtime.engine?.stop();},15*60*1000);
+  try{
+   if(profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
+   const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
+   const engine=runtime.engine=new Harness2Engine({binary,dataDir,harnessRunner,task,prompt:text,profile:resolved,key:grant?.key||secrets.open(profile.secret),engineFactory,redact:safe,
+    onEvent:event=>onEvent(task,event),onPhase:phase=>{task.pending=[];task.draft='';task.status='running';task.harnessRun.phases.push(phase);task.harnessRun.phase=phase;addEvent(task,{type:'harness2',text:'Harness² · '+phase.label+' · '+(phase.action==='propose'?'提出配置':'副本探测')});}});
+   await engine.start();if(runtime.cancelled)return;const result=safe(await engine.send());if(runtime.cancelled)return;
+   task.harnessRun={...task.harnessRun,status:result.successful?'ready':'failed',result,completedAt:new Date().toISOString()};
+   task.messages.push({id:randomUUID(),role:'assistant',text:'Harness² 优化'+(result.successful?'完成，配置等待你确认采用。':'未通过，不能采用配置。')+' 原项目未自动写回。'+(result.method?.ledger?' 探测 '+result.method.ledger.R+' 次，配置阶段 '+result.method.ledger.P+' 次。':''),at:new Date().toISOString()});
+   task.error=null;
+  }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);task.harnessRun.status='failed';addEvent(task,{type:'error',text:task.error});}}
+  finally{clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();if(runtime.cancelled)task.harnessRun.status='stopped';task.status=runtime.cancelled?'stopped':finalStatus;task.pending=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
  }
  function accountProfile(input,existing){
   const account=accounts.find(requireText(input.accountId,'账号'));if(!account.secret)throw new InputError('账号已退出，请先登录或导入');
@@ -136,8 +153,21 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
     if(!state.profiles.some(p=>p.id===input.profileId))throw new InputError('请先配置并选择模型连接');
     const task=newTask(input,folder);state.tasks.unshift(task);storage.save();changed();return send(200,{taskId:task.id});
    }
-   const match=path.match(/^\/api\/tasks\/([^/]+)\/(prompt|stop|permission|question)$/);if(!match)return send(404,{error:'未找到该操作'});
+   const match=path.match(/^\/api\/tasks\/([^/]+)\/(prompt|stop|permission|question|harness|harness-adopt|harness-clear)$/);if(!match)return send(404,{error:'未找到该操作'});
    const task=state.tasks.find(t=>t.id===match[1]);if(!task)throw new InputError('任务不存在');const runtime=active.get(task.id);
+   if(match[2]==='harness-adopt'){
+    if(runtime)throw new InputError('请先停止执行');if(input.consent!==true)throw new InputError('请确认采用此配置');
+    if(task.harnessRun?.status!=='ready'||!task.harnessRun.result?.successful)throw new InputError('没有成功的配置可以采用');
+    if(input.runId!==task.harnessRun.runId)throw new InputError('优化记录已变化，请刷新后再采用');
+    task.adoptedHarness={tree:validHarness(task.harnessRun.result.harness),adoptedAt:new Date().toISOString()};task.harnessRun.status='adopted';storage.save();changed();return send(200,view());
+   }
+   if(match[2]==='harness-clear'){if(runtime)throw new InputError('请先停止执行');delete task.adoptedHarness;storage.save();changed();return send(200,view());}
+   if(match[2]==='harness'){
+    if(runtime||active.size>=2)throw new InputError('请等待当前执行结束');if(input.consent!==true)throw new InputError('请确认副本探测和最多 10 次模型会话');
+    const status=harnessStatus(harnessRunner);if(!status.available)throw new InputError(status.reason);
+    const text=requireText(input.text,'优化任务'),profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(!profile)throw new InputError('请选择连接');
+    task.status='starting';task.error=null;task.pending=[];storage.save();const execution=runHarness(task,text,structuredClone(profile));pendingRuns.add(execution);void execution.finally(()=>pendingRuns.delete(execution));changed();return send(202,{started:true});
+   }
    if(match[2]==='prompt'){
     if(runtime)throw new InputError('本轮尚未结束');if(active.size>=2)throw new InputError('首版最多同时执行两个任务');
     const text=requireText(input.text,'任务内容');const profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(!profile)throw new InputError('请选择可用的连接');

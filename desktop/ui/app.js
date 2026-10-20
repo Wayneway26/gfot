@@ -87,10 +87,32 @@ async function createTask(){
  modal('新建项目任务','目录内的相关内容可能发送到你选择的模型服务。每个任务单独保存会话；工具权限不是操作系统沙箱。',`<label>本地项目目录<div class="folder-choice"><input name="folder" required value="${escape(folder)}" placeholder="/Users/you/project"><button type="button" id="choose-folder">选择…</button></div></label>${field('title','任务名称',folder.split('/').pop()||'新任务')}<label>模型连接<select name="profileId">${state.profiles.map(p=>`<option value="${p.id}">${escape(p.label)} · ${escape(p.model)}</option>`).join('')}</select></label><label class="check"><input type="checkbox" required>我允许所选模型处理此项目的相关内容；修改文件和运行命令需另行确认。</label>`,'创建任务',async values=>{const {taskId}=await api('tasks',values);selected=taskId;localStorage.setItem('gfot-task',selected);state=await api('state');$('#dialog').close();render();$('#prompt').focus();});
  $('#choose-folder').onclick=async()=>{if(!window.gfotDesktop)return toast('浏览器预览请手工填写目录；桌面应用支持原生目录选择。');const path=await window.gfotDesktop.chooseFolder();if(path)document.querySelector('[name=folder]').value=path;};
 }
+function optimizeHarness(){
+ const task=state.tasks.find(t=>t.id===selected);if(!task||busy(task))return;
+ if(!state.harness2?.available)return toast(state.harness2?.reason||'需要 Python 3.12 / 3.13');
+ modal('Harness² 优化执行配置','运行真实 Harness² Propose–Probe–Compose，深度 k=1。四次副本探测、三个配置阶段；含重试最多十次执行器会话，可能产生多次模型费用。',
+ `<p>读取项目文本快照（最多 200 文件 / 2 MB），排除隐藏文件、链接、依赖、构建产物和常见凭证文件名。探测在副本中执行；生成的代码不会自动写回原项目。工具审批不是操作系统沙箱。</p>`+
+ `<p>仅优化四项 Markdown 指令，不生成脚本或插件，不修改审批权限。完成后可查看证据，再决定是否采用配置。</p>`+
+ `<label>需要优化的任务<textarea name="text" required rows="4">${escape($('#prompt').value||'')}</textarea></label><label class="check"><input type="checkbox" required>允许发送副本文本并使用所选模型进行最多十次执行器会话；工具操作仍需审批。</label>`,
+ '开始优化',async values=>{await api('tasks/'+selected+'/harness',{text:values.text,profileId:$('#profile-select').value,consent:true});$('#dialog').close();state=await api('state');render();});
+}
+function renderHarness(task){
+ const run=task.harnessRun,box=$('#h2-report');box.hidden=!run&&!task.adoptedHarness;if(box.hidden)return;
+ const result=run?.result,ledger=result?.method?.ledger;
+ box.innerHTML=`<h3>Harness²</h3><p>${task.adoptedHarness?'已采用配置 · 作用于本任务后续普通执行':'配置需单独确认，不自动写回项目代码'}</p>`+
+ (run?`<p>${escape(run.status)}${run.phase?' · '+escape(run.phase.label):''}</p>`:'')+
+ (ledger?`<p>探测 ${ledger.R} 次 · 配置阶段 ${ledger.P} 次</p><p>费用数据未接入，账本中的 USD 0 不表示免费。</p>`:'')+
+ (result?`<details><summary>候选执行证据</summary><pre>${escape(JSON.stringify(result.candidates,null,2))}</pre></details><details><summary>合成配置与阶段说明</summary><pre>${escape(JSON.stringify({harness:result.harness,stages:result.method?.stages},null,2))}</pre></details><details><summary>合成候选回答（源项目未应用）</summary><pre>${escape(result.answer||'')}</pre></details>`:'')+
+ (run?.status==='ready'&&!busy(task)?'<button type="button" id="h2-adopt">确认采用配置</button>':'')+
+ (task.adoptedHarness&&!busy(task)?'<button type="button" id="h2-clear">恢复默认配置</button>':'');
+ const adopt=$('#h2-adopt');if(adopt)adopt.onclick=async()=>{try{state=await api('tasks/'+task.id+'/harness-adopt',{runId:run.runId,consent:true});render();}catch(e){toast(e.message);}};
+ const clear=$('#h2-clear');if(clear)clear.onclick=async()=>{try{state=await api('tasks/'+task.id+'/harness-clear',{});render();}catch(e){toast(e.message);}};
+}
 function render(){
  $('#task-list').innerHTML=state.tasks.map(t=>`<button class="task-item ${t.id===selected?'active':''}" data-task="${t.id}"><strong>${escape(t.title)}</strong><small>${escape(t.folder.split('/').pop())} · ${labels[t.status]||t.status}</small></button>`).join('')||'<p class="section-label">还没有项目任务</p>';
  $('#connection-dot').classList.toggle('ready',state.profiles.length>0);
  const task=state.tasks.find(t=>t.id===selected);$('#welcome').hidden=!!task;$('#workspace').hidden=!task;$('#breadcrumb').textContent=task?'工作区 / '+task.title:'工作区';if(!task)return;
+ renderHarness(task);$('#h2-optimize').disabled=busy(task)||!state.harness2?.available;$('#h2-optimize').title=state.harness2?.reason||'四次副本探测后合成配置';
  $('#task-title').textContent=task.title;$('#folder-label').textContent='⌁ '+task.folder;$('#status').textContent=labels[task.status]||task.status;
  const options=state.profiles.map(p=>`<option value="${p.id}">${escape(p.label)} · ${escape(p.model)}</option>`).join('');if($('#profile-select').innerHTML!==options){const chosen=$('#profile-select').value||task.profileId;$('#profile-select').innerHTML=options;$('#profile-select').value=state.profiles.some(p=>p.id===chosen)?chosen:task.profileId;}
  if(rendered!==selected){rendered=selected;$('#profile-select').value=task.profileId;$('#prompt').value='';messageSignature='';}
@@ -100,6 +122,7 @@ function render(){
  $('#events').innerHTML=task.events.slice().reverse().map(e=>`<details><summary>${escape(e.text)}</summary><pre>${escape(e.detail||new Date(e.at).toLocaleTimeString())}</pre></details>`).join('');
  const approvals=JSON.stringify([selected,task.pending]);if(approvals!==approvalSignature){approvalSignature=approvals;$('#approvals').innerHTML=task.pending.map(p=>p.kind==='permission'?`<div class="approval"><strong>需要批准：${escape(p.permission||p.type||'工具操作')}</strong><pre>${escape(JSON.stringify(p.patterns||p.metadata||{},null,2))}</pre><div class="actions"><button data-permission="${p.id}" data-reply="reject">拒绝</button><button data-permission="${p.id}" data-reply="once">批准一次</button></div></div>`:`<form class="approval question-form" data-question="${p.id}"><strong>请回答执行器的问题</strong>${(p.questions||[]).map((q,i)=>`<label>${escape(q.question||q.header)}<input name="q${i}" placeholder="${escape((q.options||[]).map(o=>o.label).join(' / '))}" required></label>`).join('')}<button type="submit">提交回答</button></form>`).join('');}
 }
+$('#h2-optimize').onclick=optimizeHarness;
 $('#settings').onclick=settings;$('#new-task').onclick=()=>createTask().catch(e=>toast(e.message));$('#welcome-new').onclick=$('#new-task').onclick;
 $('#composer').onsubmit=async event=>{event.preventDefault();const text=$('#prompt').value.trim();if(!text)return;const button=$('#send');button.disabled=true;try{await api('tasks/'+selected+'/prompt',{text,profileId:$('#profile-select').value});$('#prompt').value='';state=await api('state');render();}catch(e){toast(e.message);}finally{button.disabled=false;}};
 $('#prompt').onkeydown=event=>{if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();$('#composer').requestSubmit();}};

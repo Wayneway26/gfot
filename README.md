@@ -9,7 +9,7 @@ One client. Your local projects, accounts and model connections.
 
 **English** · [简体中文](README.zh-CN.md)
 
-![Preview](https://img.shields.io/badge/preview-v0.4.1-2862F5?style=flat-square)
+![Preview](https://img.shields.io/badge/preview-h2%20branch-2862F5?style=flat-square)
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
@@ -27,7 +27,7 @@ One client. Your local projects, accounts and model connections.
 
 > **gfot 是面向本地 AI Agent 生态的统一桌面工作区。** 用一个客户端管理项目、任务对话、账号与模型连接，在同一个任务中继续工作。当前内置 OpenCode 执行引擎，支持 Codex 凭证接入、兼容 API 和本地代理，并逐步扩展其他 Agent 的适配。
 
-The longer-term goal is a common task entry point for the local Agent ecosystem, including WorkBuddy, Codex, Qwen Office (千问办公), Doubao Work (豆包工作), OpenCode and Trae. **Support is incremental: v0.4 does not launch or switch all of these Agent applications.** The matrix below states what actually exists.
+The longer-term goal is a common task entry point for the local Agent ecosystem, including WorkBuddy, Codex, Qwen Office (千问办公), Doubao Work (豆包工作), OpenCode and Trae. **Support is incremental: this preview does not launch or switch all of these Agent applications.** The matrix below states what actually exists.
 
 The execution loop is bundled **OpenCode**. You choose the models and accounts it connects to; you do not need a separate Codex or OpenCode application to run the desktop client. Importing existing Codex credentials requires an existing Codex login file.
 
@@ -52,6 +52,8 @@ The execution loop is bundled **OpenCode**. You choose the models and accounts i
 
 A compatible HTTPS API or CC Switch endpoint can be configured separately. This does not make an installed Agent automatically callable, and it is not evidence that WorkBuddy, Qwen Office, Doubao Work or Trae is supported through a proxy.
 
+> **h2 branch preview:** includes the optional Harness² task-level optimization workflow. Main remains the regular execution baseline.
+
 ## Get started
 
 ### Run from source
@@ -59,7 +61,7 @@ A compatible HTTPS API or CC Switch endpoint can be configured separately. This 
 Requires **macOS on Apple silicon, Node.js 22.12+ and npm**.
 
 ```sh
-git clone https://github.com/Wayneway26/gfot.git
+git clone --branch h2 https://github.com/Wayneway26/gfot.git
 cd gfot
 npm ci
 node node_modules/electron/install.js
@@ -116,11 +118,27 @@ Using an account in gfot does not create extra allowance or reset its five-hour 
 - **OpenCode** runs the agent loop and tools. Selecting a Codex model does not launch the complete Codex agent.
 - **The account proxy** keeps subscription credentials out of the execution process and gives it a temporary, account-and-model-bound proxy key.
 
-### Where does Harness² fit?
+### Harness² is connected on this branch
 
-[Google Harness²](https://github.com/google-research/harness2) is a planned **optional outer improvement layer** around the executor. **It is not imported, invoked or bundled in v0.4.**
+The `h2` branch runs the **real pinned Google Harness² core**, not a renamed execution loop. In a task, click **Harness² 优化**, describe the work and confirm the multiple-session cost. Python 3.12 or 3.13 is required for this optional workflow; ordinary execution does not require Python.
 
-The intended integration is to propose harness changes, probe them in isolated copies with an explicit budget, compare results and let the user adopt a configuration. The working desktop execution loop today is OpenCode; model switching does not run Harness².
+```text
+User task → explicit optimization consent
+  → baseline OpenCode probe in a project copy
+  → Harness²: propose general and task-specific harness changes
+  → independent OpenCode candidate probes
+  → Harness²: compose a configuration from execution evidence
+  → composed OpenCode probe → inspect evidence → explicitly adopt configuration
+  → later ordinary turns use the adopted instructions in the original project
+```
+
+- Uses upstream `core.recursion.run_sequential(k=1)`: four probes and three configuration stages. Invalid proposals may retry, with at most ten executor sessions, sixteen steps per session, three minutes per session and fifteen minutes overall. A session can make multiple model requests; this is not a token or dollar budget. Cost telemetry is not integrated; upstream USD zero fields mean unknown cost here.
+- Only four always-on Markdown instruction files can change. The proposal channel is read-only. Generated scripts, plugins, subagents and permission changes are rejected.
+- Probes use independent bounded text copies (200 files / 2 MB), excluding hidden paths, symlinks, dependency/build/data folders and common credential filenames. This is a filtered copy, not a complete build environment or an OS sandbox. Review tool approvals; no probe code is automatically merged into your project.
+- Inspect candidate answers, trajectory excerpts and configuration notes in the task panel. A successful composed run enables **确认采用配置**; adoption persists only for later normal turns in that task and can be cleared. Completion does not prove an improvement in task quality.
+- Python sources ship separately from the Electron archive, with the upstream license and commit/file-hash manifest. No benchmark setup or external Harness² checkout is needed. Set `GFOT_PYTHON` to a Python 3.12/3.13 executable if discovery fails, then restart the app.
+
+The inner tool loop remains **OpenCode**. Cross-task automatic reflection, the experience library, parallel recursion and deeper `k>1` optimization are not implemented in this first integration. [Integration contract and upstream pin](docs/h2-integration.md).
 
 ## Local data and permissions
 
@@ -139,7 +157,9 @@ npm test
 npm run test:ui
 ```
 
-**76 automated tests passed locally**, including real OpenCode execution against synthetic model servers, approved temporary file writes, tool-result return, same-conversation account switching, credential encryption/redaction, refresh races and cancellation.
+**82 automated tests passed locally**, including real OpenCode execution against synthetic model servers, approved temporary file writes, tool-result return, same-conversation account switching, credential encryption/redaction, refresh races and cancellation.
+
+The Harness² additions test the real upstream Python core, source filtering, failure/fallback accounting, cancellation, explicit adoption and vendored source hashes. Native UI tests additionally run the workflow through real OpenCode with synthetic models.
 
 A separately authorized diagnostic passed with **one real Codex-import account**. It sent fixed diagnostic prompts, used no shared refresh credential and left the original file unchanged. Real cross-account execution, browser OAuth and other upstream models remain unverified.
 
@@ -158,7 +178,8 @@ A separately authorized diagnostic passed with **one real Codex-import account**
 - [ ] Investigate interfaces and authorization for Qwen Office / Doubao Work
 - [ ] Quota-aware routing with safe task continuation
 - [ ] Signed and notarized macOS distribution
-- [ ] Optional Harness² improvement mode
+- [x] Optional Harness² task-level Propose–Probe–Compose (`h2` branch)
+- [ ] Cross-task Harness² reflection/library and deeper recursion
 
 The desktop client does not import Codex / WorkBuddy chat histories or switch their complete execution engines. The earlier manual handoff workbench is still available with `npm start`; it uses separate task storage. [Earlier specification](gfot-prd.md)
 

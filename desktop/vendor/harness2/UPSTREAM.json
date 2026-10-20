@@ -1,0 +1,27 @@
+{
+  "repository": "https://github.com/google-research/harness2",
+  "commit": "1cfe254e8d25b15f37048c3730134686abe60335",
+  "license": "Apache-2.0",
+  "files": {
+    "harness2/config.py": "0db5ba0c42b87f5b14cbff2d11aaecddda1cd45500903c1d61741232bd1e0a88",
+    "harness2/__init__.py": "de20a79ef3cf3974bf32cb6afdbb32608655676e749a466ffd6c7c173bb7e26a",
+    "harness2/core/tree.py": "c2a15690b1b6b02156e922c5e0b1a215c5065d7bea5a3bae2e56b47309197552",
+    "harness2/core/library.py": "00219fda201a030f43b35b49c4e73ccf336aedc81164144c435b4b06a1256dd3",
+    "harness2/core/ledger.py": "7059de5d90fc9fb8d4b3b799ff075f09d34f182ba0fdb56eb9d8b8383d0bbf55",
+    "harness2/core/__init__.py": "ce487673e00fd8921139e3afb688c566fc43d9b07acba048d2102663a81f7151",
+    "harness2/core/spec.py": "f245ec9e314778e2a1a51594b906584255b9eed8340c073b864a8a6f2c8dc400",
+    "harness2/core/runmark.py": "99a7c3f0b023623224c3376bc0390e985b8e6608f0928d34b821ffe6c36f9175",
+    "harness2/core/prompts.py": "d1f4f8db4ab4cb4addcbca175b548db2270375499fda727ac95d271c63cc2504",
+    "harness2/core/proposer.py": "475ef49d72228e249d7172d793f8362913774412402dfd259ae6e01c6586e175",
+    "harness2/core/context.py": "63dd482e5d9467d7e659d186a11289fc7861d08c8aed603244ff0cee92de91f3",
+    "harness2/core/judge.py": "0f8cd6f4ec659f5d5976bdad4ccdc432651f51486c3fbbee36be53a6d619fbba",
+    "harness2/core/selection.py": "2cb3353b2fd4ec72e6322f2c1f35db1ff2cdab88b0b50c8809d1841d235cb92f",
+    "harness2/core/schedule.py": "6e46c5ab1e4ac111818ff3acd6b636e39d650898189ac0c21802a8233ad4cd38",
+    "harness2/core/recursion.py": "b299813b5334f2c0f89024a7f14162f0fdd5418ebd4413be93920b5334a204c1",
+    "harness2/core/report.py": "9d5b119ec93dc6b2c6341095130103ab4ba2f2dc6867c4b7ea759fca5de3cac9",
+    "harness2/substrate/codex.py": "281a07271ebed72a617a671ced1b9137901aa8f5d1deffb56c706f44c295e416",
+    "harness2/substrate/__init__.py": "57f95d86cb0d4acfd60fddd52f2d140ffadcf0c318e28093532580339dc3f37d",
+    "harness2/substrate/opencode.py": "dabc79953d164a0d38802125756379ffa6acdc7b553d2f9036475f8220166ff0",
+    "harness2/substrate/base.py": "50a63f174e3772888af3882f3ffff3162cefba8d36e927b1a5de343c5806dd16"
+  }
+}

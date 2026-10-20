@@ -9,7 +9,7 @@ One desktop workspace for your AI coding connections.
 
 [English](README.md) · **简体中文**
 
-![Preview](https://img.shields.io/badge/preview-v0.4.1-2862F5?style=flat-square)
+![Preview](https://img.shields.io/badge/preview-h2%20branch-2862F5?style=flat-square)
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
@@ -25,7 +25,7 @@ One desktop workspace for your AI coding connections.
 
 **gfot 是面向本地 AI Agent 生态的统一桌面工作区。** 用一个客户端管理项目、任务对话、账号与模型连接，在同一个任务中继续工作。当前内置 OpenCode 执行引擎，支持 Codex 凭证接入、兼容 API 和本地代理，并逐步扩展其他 Agent 的适配。
 
-长期目标是为 WorkBuddy、Codex、千问办公、豆包工作、OpenCode、Trae 等工具提供统一的任务入口，逐步接入各自可用的授权、模型或执行接口。**适配会逐项完成，v0.4 尚不能直接启动和切换上述全部 Agent。** 下表列出实际接入进度。
+长期目标是为 WorkBuddy、Codex、千问办公、豆包工作、OpenCode、Trae 等工具提供统一的任务入口，逐步接入各自可用的授权、模型或执行接口。**适配会逐项完成，此预览版尚不能直接启动和切换上述全部 Agent。** 下表列出实际接入进度。
 
 执行循环使用内置的 **OpenCode**，模型和账号由你选择。运行桌面客户端无需另外安装 Codex 或 OpenCode；如果选择导入 Codex 凭证，则需要已有的 Codex 登录文件。
 
@@ -50,6 +50,8 @@ One desktop workspace for your AI coding connections.
 
 你可以另外配置兼容的 HTTPS API 或 CC Switch 地址，但这不意味着本机安装了某个 Agent 就能直接调用，也不意味着 WorkBuddy、千问办公、豆包工作或 Trae 已经通过代理接通。
 
+> **h2 分支预览：** 已接入可选的 Harness² 任务级优化流程，main 分支保留普通执行基线。
+
 ## 开始使用
 
 ### 从源码运行
@@ -57,7 +59,7 @@ One desktop workspace for your AI coding connections.
 需要 **Apple silicon Mac、Node.js 22.12+ 和 npm**。
 
 ```sh
-git clone https://github.com/Wayneway26/gfot.git
+git clone --branch h2 https://github.com/Wayneway26/gfot.git
 cd gfot
 npm ci
 node node_modules/electron/install.js
@@ -114,11 +116,27 @@ Codex 导入使用可能变化的非官方兼容接口；独立 ChatGPT 登录�
 - **OpenCode** 负责 Agent Loop 和工具执行。选择 Codex 模型不会启动完整的 Codex Agent。
 - **账号代理** 保管上游订阅凭证，只给执行进程分发绑定账号和模型的临时代理密钥。
 
-### Harness² 用在哪里？
+### h2 分支已经接入 Harness²
 
-[Google Harness²](https://github.com/google-research/harness2) 计划作为执行器外层的**可选改进机制**。**v0.4 没有导入、调用或打包 Harness²。**
+本分支调用 **Google Harness² 固定版本的真实核心代码**，并非给现有循环换名字。在任务中点击 **Harness² 优化**，填写目标并确认多次会话的费用。此可选流程需要 Python 3.12 或 3.13；普通任务执行无需 Python。
 
-计划中的接入方式是：提出 harness 改动，在隔离副本中按明确预算探测，对比结果，再由用户决定是否采用。当前可运行的桌面执行循环是 OpenCode；切换模型不会运行 Harness²。
+```text
+任务目标 → 明确同意优化
+  → 在项目副本中运行 OpenCode 基线
+  → Harness² 提出通用 / 任务专用配置
+  → 在独立副本中运行候选 OpenCode 探测
+  → Harness² 根据执行证据合成配置
+  → 合成配置探测 → 查看证据 → 用户确认采用
+  → 本任务后续普通执行在原项目使用已采用的指令
+```
+
+- 调用上游 `core.recursion.run_sequential(k=1)`，包含四次探测、三个配置阶段。无效提案可能重试，总计最多十次执行器会话，每会话十六步、三分钟，总流程十五分钟。一个会话可能多次请求模型，这不是 Token 或金额上限。费用数据尚未接入，上游 USD 为 0 在此表示未知费用。
+- 只允许修改四项常驻 Markdown 指令。提案会话只读，拒绝生成脚本、插件、子 Agent 和权限配置。
+- 每次探测使用独立的受限文本快照，最多 200 文件 / 2 MB；排除隐藏路径、符号链接、依赖、构建、数据目录及常见凭证文件名。快照不是完整构建环境，也不是操作系统沙箱。请检查工具审批，探测代码不会自动合并回原项目。
+- 面板展示候选回答、执行轨迹摘录和配置说明。合成候选成功结束后才提供 **确认采用配置**。采用结果只作用于本任务后续普通执行，可恢复默认；流程完成不等于任务质量一定提高。
+- Python 源码以独立应用资源打包，保留上游许可证、提交号及逐文件哈希，无需安装基准测试或依赖外部 Harness² 仓库。自动发现 Python 失败时可设置 `GFOT_PYTHON` 指向 3.12/3.13 可执行文件，再重启应用。
+
+底层工具循环仍是 **OpenCode**。本次尚未实现跨任务自动反思 / 经验库、并行递归或 `k>1` 深度优化。[接入契约与上游版本](docs/h2-integration.md)。
 
 ## 本地数据与权限
 
@@ -137,7 +155,9 @@ npm test
 npm run test:ui
 ```
 
-**本机 76 项自动测试通过**：覆盖真实 OpenCode 进程与合成模型的联调、批准后写临时文件、工具结果回传、同一会话切换账号、凭证加密与脱敏、刷新竞争和停止执行。
+**本机 82 项自动测试通过**：覆盖真实 OpenCode 进程与合成模型的联调、批准后写临时文件、工具结果回传、同一会话切换账号、凭证加密与脱敏、刷新竞争和停止执行。
+
+Harness² 新增检查覆盖真实上游 Python 核心、快照过滤、失败回退、取消、显式采用和上游源码哈希。原生界面测试还使用真实 OpenCode 与合成模型运行完整优化链路。
 
 另经明确授权，使用**一个真实 Codex 导入账号**完成了固定诊断。没有发送项目文件，没有使用共享刷新凭证，原文件前后保持一致。真实跨账号执行、浏览器 OAuth 和其他上游模型仍待验证。
 
@@ -156,7 +176,8 @@ npm run test:ui
 - [ ] 调查千问办公、豆包工作的接口与授权方式
 - [ ] 结合额度与安全续接的路由机制
 - [ ] macOS 签名与公证分发
-- [ ] 可选的 Harness² 改进模式
+- [x] 可选的 Harness² 任务级 Propose–Probe–Compose（h2 分支）
+- [ ] 跨任务 Harness² 反思 / 经验库及更深递归
 
 桌面版不导入 Codex / WorkBuddy 的聊天记录，也不切换它们完整的执行引擎。早期的手工交接工作台仍可通过 `npm start` 运行，但使用独立的任务存储。[早期规格说明](gfot-prd.md)
 

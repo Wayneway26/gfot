@@ -25,7 +25,7 @@ export function vault(key){
 export function createStore(dir){
  mkdirSync(dir,{recursive:true,mode:0o700});const path=join(dir,'desktop.json');let state;
  try{state=JSON.parse(readFileSync(path,'utf8'));if(state.version!==1||!Array.isArray(state.tasks)||!Array.isArray(state.profiles))throw Error('Unsupported data');}catch(e){if(e.code!=='ENOENT')throw e;state={version:1,profiles:[],tasks:[]};}
- for(const task of state.tasks)if(['running','starting','permission'].includes(task.status)){task.status='interrupted';task.pending=[];task.error='上次执行被中断。核对文件和执行记录后再继续。';}
+ for(const task of state.tasks)if(['running','starting','permission'].includes(task.status)){task.status='interrupted';if(task.harnessRun?.status==='running')task.harnessRun.status='interrupted';task.pending=[];task.error='上次执行被中断。核对文件和执行记录后再继续。';}
  function save(){writeFileSync(path+'.tmp',JSON.stringify(state,null,2),{mode:0o600});renameSync(path+'.tmp',path);}
  save();return {state,save};
 }

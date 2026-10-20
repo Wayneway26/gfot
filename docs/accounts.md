@@ -38,7 +38,7 @@ OpenCode 使用内置 OpenAI SDK 处理 Responses SSE 与工具调用。gfot 的
 - 系统钥匙串中其他 Agent 私有条目的自动读取。
 - 自动额度检测与故障切换、通用全平台 Token 兑换。
 - 原 Codex / WorkBuddy 聊天记录与内部记忆迁移。
-- Harness² 递归改进；当前执行器仍为 OpenCode。
+- Harness² 跨任务经验反思与更深递归；h2 分支已提供任务级 k=1 优化，内层执行器仍为 OpenCode。
 
 ## 已验证与未验证
 
