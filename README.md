@@ -23,7 +23,9 @@ One client. Your local projects, accounts and model connections.
 
 ## One client for your AI coding workflow
 
-gfot gives your AI coding work a single desktop home: local project folders, saved task conversations, account and model connections, tool approvals and execution records. Change connections between turns and continue the same gfot task instead of starting another conversation.
+**gfot is a unified desktop workspace for the local AI Agent ecosystem.** Manage projects, task conversations, accounts and model connections in one client, and keep working on the same task. It currently bundles the OpenCode execution engine, supports Codex credential import, compatible APIs and local proxies, and is gradually expanding its Agent integrations.
+
+> **gfot 是面向本地 AI Agent 生态的统一桌面工作区。** 用一个客户端管理项目、任务对话、账号与模型连接，在同一个任务中继续工作。当前内置 OpenCode 执行引擎，支持 Codex 凭证接入、兼容 API 和本地代理，并逐步扩展其他 Agent 的适配。
 
 The longer-term goal is a common task entry point for the local Agent ecosystem, including WorkBuddy, Codex, Qwen Office (千问办公), Doubao Work (豆包工作), OpenCode and Trae. **Support is incremental: v0.4 does not launch or switch all of these Agent applications.** The matrix below states what actually exists.
 
