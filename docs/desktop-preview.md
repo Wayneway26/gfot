@@ -4,9 +4,13 @@
 
 ## 当前产品
 
-自己的 macOS GUI → 本地任务服务 → 内置 OpenCode Agent Loop → 用户配置的 HTTPS 兼容 API 或本机模型服务 → 上游 / 本机模型。
+一个客户端，管理本地项目、任务对话、账号和模型连接。
+
+当前执行路径：自己的 macOS GUI → 本地任务服务 → 内置 OpenCode Agent Loop → gfot Codex 凭证代理、用户配置的 HTTPS API 或本机模型服务 → 上游 / 本机模型。
 
 同一个本地项目、同一个任务和 OpenCode 会话，可以在回合之间选择不同模型连接。模型改变，执行器保持不变。这与切换到 WorkBuddy / Codex 的完整 Agent 执行器不同。
+
+长期目标是逐步为 WorkBuddy、Codex、千问办公、豆包工作、OpenCode、Trae 等工具提供统一任务入口；当前接入范围以 [README 支持矩阵](../README.zh-CN.md#agent-接入进度) 为准。旧工作台的 WorkBuddy MCP 桥接不等于桌面版已能调用 WorkBuddy 执行器。
 
 ## 可用范围
 

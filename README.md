@@ -2,10 +2,10 @@
 
 <img src="docs/readme-hero.svg" alt="gfot — One project. Keep going. 一个项目，接着做下去。" width="100%" />
 
-**A local-first macOS workspace for AI coding.**<br />
-Choose a folder. Connect your models. Continue the same task.
+**One desktop workspace for your AI coding connections.**<br />
+One client. Your local projects, accounts and model connections.
 
-面向 AI 编程的本地 macOS 工作区。选一个目录，连接模型，把任务接着做下去。
+一个客户端，管理本地项目、任务对话与 AI 编程连接。
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
@@ -13,7 +13,7 @@ Choose a folder. Connect your models. Continue the same task.
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
-[Get started](#get-started) · [Connections](#connect-your-models) · [How it works](#how-it-works) · [Roadmap](#roadmap)
+[Get started](#get-started) · [Agent support](#agent-support-at-a-glance) · [Connections](#connect-your-models) · [How it works](#how-it-works) · [Roadmap](#roadmap)
 
 </div>
 
@@ -21,9 +21,11 @@ Choose a folder. Connect your models. Continue the same task.
 
 ![gfot macOS desktop preview](docs/desktop-preview.png)
 
-## Keep the task. Choose the model.
+## One client for your AI coding workflow
 
-gfot brings your project folder, conversation, model connections and tool approvals into one desktop window. Switch connections between turns while continuing the same gfot task and its saved conversation.
+gfot gives your AI coding work a single desktop home: local project folders, saved task conversations, account and model connections, tool approvals and execution records. Change connections between turns and continue the same gfot task instead of starting another conversation.
+
+The longer-term goal is a common task entry point for the local Agent ecosystem, including WorkBuddy, Codex, Qwen Office (千问办公), Doubao Work (豆包工作), OpenCode and Trae. **Support is incremental: v0.4 does not launch or switch all of these Agent applications.** The matrix below states what actually exists.
 
 The execution loop is bundled **OpenCode**. You choose the models and accounts it connects to; you do not need a separate Codex or OpenCode application to run the desktop client. Importing existing Codex credentials requires an existing Codex login file.
 
@@ -32,6 +34,21 @@ The execution loop is bundled **OpenCode**. You choose the models and accounts i
 | Local folders, persistent conversations and a visible execution timeline. | Codex credential import, HTTPS APIs, CC Switch routes and local models. | Review file edits and commands, answer questions, or stop a run. |
 
 > **Preview status:** Apple silicon, unsigned build. One real Codex-import account passed model discovery, Responses inference and a tool-result round trip. Independent ChatGPT browser login is implemented but still awaits real-account validation. [Verification details →](docs/verification.md)
+
+## Agent support at a glance
+
+| Agent / tool | What gfot currently connects | Evidence and boundary |
+| --- | --- | --- |
+| **OpenCode** | Bundled desktop execution engine: tools, approvals and saved conversations. | Real processes tested with synthetic models, including an approved file write and same-session account switching. |
+| **Codex** | Imports a local login credential and routes model requests through gfot's scoped proxy. | One real account passed model discovery, inference and tool-result return. Does not control the Codex desktop app or run the full Codex agent. |
+| **WorkBuddy** | The separate legacy workbench has an MCP bridge for review snapshots, results and task checkpoints. | HTTP / stdio bridge tests pass. This is not a WorkBuddy credential adapter or a desktop execution connection. |
+| **Qwen Office / 千问办公** | Integration candidate. | No adapter or validation yet; its usable interface and authorization need investigation. |
+| **Doubao Work / 豆包工作** | Integration candidate. | No adapter or validation yet; its usable interface and authorization need investigation. |
+| **Trae** | Planned Agent integration. | No credential or execution adapter, and no end-to-end validation yet. |
+
+**Model connections and Agent execution are different layers.** Today the desktop client switches the model/account connection while OpenCode remains the executor. Switching complete Agent runtimes would also require separate adapters for tools, permissions, execution events and task handoff; that layer is not implemented.
+
+A compatible HTTPS API or CC Switch endpoint can be configured separately. This does not make an installed Agent automatically callable, and it is not evidence that WorkBuddy, Qwen Office, Doubao Work or Trae is supported through a proxy.
 
 ## Get started
 
@@ -135,6 +152,8 @@ A separately authorized diagnostic passed with **one real Codex-import account**
 - [x] One real Codex-account inference and tool diagnostic
 - [ ] Broader real-provider compatibility coverage
 - [ ] Native credential adapters for WorkBuddy, Claude Code, Gemini and Grok
+- [ ] Full Agent execution adapters, including WorkBuddy, Codex and Trae
+- [ ] Investigate interfaces and authorization for Qwen Office / Doubao Work
 - [ ] Quota-aware routing with safe task continuation
 - [ ] Signed and notarized macOS distribution
 - [ ] Optional Harness² improvement mode

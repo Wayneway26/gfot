@@ -2,10 +2,10 @@
 
 <img src="docs/readme-hero.svg" alt="gfot — 一个项目，接着做下去。One project. Keep going." width="100%" />
 
-**面向 AI 编程的本地 macOS 工作区。**<br />
-选一个目录，连接模型，把任务接着做下去。
+**一个客户端，管理你的 AI 编程连接。**<br />
+本地项目、任务对话、账号与模型连接，都在这里。
 
-A local-first macOS workspace for AI coding.
+One desktop workspace for your AI coding connections.
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
@@ -13,7 +13,7 @@ A local-first macOS workspace for AI coding.
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
-[开始使用](#开始使用) · [连接模型](#连接模型) · [运行原理](#运行原理) · [开发计划](#开发计划)
+[开始使用](#开始使用) · [接入进度](#agent-接入进度) · [连接模型](#连接模型) · [运行原理](#运行原理) · [开发计划](#开发计划)
 
 </div>
 
@@ -21,9 +21,11 @@ A local-first macOS workspace for AI coding.
 
 ![gfot macOS 桌面预览](docs/desktop-preview.png)
 
-## 任务继续，模型自选
+## 一个客户端，接着做同一个任务
 
-gfot 把本地项目目录、对话、模型连接和工具审批放进一个桌面窗口。在回合之间切换连接，继续同一个 gfot 任务，保留已保存的对话。
+gfot 是面向本地 AI Agent 生态的统一桌面工作区：用一个客户端管理项目目录、持久化任务对话、账号和模型连接、工具审批与执行记录。在回合之间切换连接，继续同一个 gfot 任务，保留已保存的对话。
+
+长期目标是为 WorkBuddy、Codex、千问办公、豆包工作、OpenCode、Trae 等工具提供统一的任务入口，逐步接入各自可用的授权、模型或执行接口。**适配会逐项完成，v0.4 尚不能直接启动和切换上述全部 Agent。** 下表列出实际接入进度。
 
 执行循环使用内置的 **OpenCode**，模型和账号由你选择。运行桌面客户端无需另外安装 Codex 或 OpenCode；如果选择导入 Codex 凭证，则需要已有的 Codex 登录文件。
 
@@ -32,6 +34,21 @@ gfot 把本地项目目录、对话、模型连接和工具审批放进一个桌
 | 本地目录、持久化对话、可查看的执行记录。 | Codex 凭证导入、HTTPS API、CC Switch 路由与本机模型。 | 审批文件修改和命令，回答执行中的问题，随时停止。 |
 
 > **预览版状态：** 目前面向 Apple silicon，安装包尚未签名。一个真实 Codex 导入账号已通过模型目录、Responses 推理及工具结果回传诊断。独立 ChatGPT 浏览器登录已实现，仍待真实账号验收。[查看验证记录 →](docs/verification.md)
+
+## Agent 接入进度
+
+| Agent / 工具 | gfot 目前接到了哪一层 | 验证与边界 |
+| --- | --- | --- |
+| **OpenCode** | 内置桌面执行引擎，负责工具、审批和会话。 | 已用真实进程配合合成模型验证文件修改审批与同一会话切换账号。 |
+| **Codex** | 导入本地登录凭证，通过 gfot 本地代理调用模型。 | 一个真实账号通过目录、推理与工具回传诊断；不是控制 Codex 桌面端，也未运行完整 Codex Agent。 |
+| **WorkBuddy** | 独立的旧工作台提供 MCP 桥接，处理审查副本、返回结果和任务检查点。 | HTTP / stdio 桥接测试通过；不是 WorkBuddy 凭证适配，也未接入桌面版执行链路。 |
+| **千问办公** | 后续适配候选。 | 尚无适配器或验证，可用接口与授权方式需要进一步调查。 |
+| **豆包工作** | 后续适配候选。 | 尚无适配器或验证，可用接口与授权方式需要进一步调查。 |
+| **Trae** | 计划接入。 | 尚无凭证或执行适配器，尚未完成端到端验证。 |
+
+**切换模型连接与切换完整 Agent 是两层能力。** 当前桌面版切换的是模型或账号连接，执行器始终为 OpenCode。要切换完整 Agent，还需分别适配它们的工具、权限、执行事件和任务交接；这一层尚未实现。
+
+你可以另外配置兼容的 HTTPS API 或 CC Switch 地址，但这不意味着本机安装了某个 Agent 就能直接调用，也不意味着 WorkBuddy、千问办公、豆包工作或 Trae 已经通过代理接通。
 
 ## 开始使用
 
@@ -135,6 +152,8 @@ npm run test:ui
 - [x] 一个真实 Codex 账号的推理与工具诊断
 - [ ] 更完整的真实供应方兼容性覆盖
 - [ ] WorkBuddy、Claude Code、Gemini 和 Grok 原生凭证适配
+- [ ] WorkBuddy、Codex、Trae 等完整 Agent 的执行适配
+- [ ] 调查千问办公、豆包工作的接口与授权方式
 - [ ] 结合额度与安全续接的路由机制
 - [ ] macOS 签名与公证分发
 - [ ] 可选的 Harness² 改进模式
