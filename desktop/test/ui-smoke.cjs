@@ -27,6 +27,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  const until=async expression=>{for(let i=0;i<1000;i++){const value=await js(expression);if(value)return value;await delay(50);}throw Error('UI condition timed out: '+expression);};
  const api=async(route,body)=>js(`fetch('/api/${route}',{method:'${body===undefined?'GET':'POST'}',headers:{'content-type':'application/json'},body:${body===undefined?'undefined':JSON.stringify(JSON.stringify(body))}}).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);return data;})`);
  await until("document.body.innerText.includes('一个项目')");
+ await until("Array.from(document.querySelectorAll('img')).every(img => img.complete && img.naturalWidth > 0)");
  assert.equal(await js('typeof require'),'undefined');assert.equal(await js('typeof gfotDesktop.chooseFolder'),'function');assert.equal(await js('typeof gfotDesktop.importCodex'),'function');assert.equal(await js('typeof gfotDesktop.loginChatGPT'),'function');
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop.png'),(await win.webContents.capturePage()).toPNG());
  await new Promise(r=>gateway.listen(0,'127.0.0.1',r));
@@ -63,6 +64,11 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  assert.deepEqual(models,['alpha','beta']);
  const state=await api('state');assert.equal(state.tasks[0].messages.length,4);
  await js("document.querySelector('#settings').click()");assert.equal(await js("document.querySelector('#dialog').open"),true);await js("document.querySelector('#settings-close').click()");
+ win.setSize(840,600);await delay(200);
+ const compact=await js(`({viewport:innerWidth,body:document.documentElement.scrollWidth,send:document.querySelector('#composer button[type=submit]').getBoundingClientRect().right})`);
+ assert.ok(compact.body<=compact.viewport && compact.send<=compact.viewport,'compact layout must keep the send button visible');
+ fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-compact.png'),(await win.webContents.capturePage()).toPNG());
+ win.setSize(1240,820);await delay(200);
  const beforeH2=await api('state');assert.equal(beforeH2.harness2.available,true,'UI H2 test requires Python 3.12/3.13');
  await js("document.querySelector('#h2-optimize').click();document.querySelector('#modal-form').elements.text.value='Explain the fixture; do not modify files.';document.querySelector('#modal-form input[type=checkbox]').checked=true;document.querySelector('#modal-form').requestSubmit()");
  await until("document.querySelector('#h2-adopt') && document.querySelector('#status').textContent==='等待任务'");
@@ -74,7 +80,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  assert.ok(requestBodies.at(-1).includes('H2_FIXTURE_ADOPTED'),'adopted prompt must reach the real executor');
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-harness2.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-task.png'),(await win.webContents.capturePage()).toPNG());
- fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','screenshot']},null,2));
+ fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','brand SVG assets loaded','840px composer stays within viewport','screenshot']},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({ok:false,error:String(error),stack:error.stack}));gateway.close();app.exit(1);}finally{gateway.close();app.quit();}});});
 require(resources?path.join(resources,'app.asar','desktop','main.cjs'):path.join(__dirname,'..','main.cjs'));
 setTimeout(()=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:'120s timeout'}));app.exit(1);},120000).unref();

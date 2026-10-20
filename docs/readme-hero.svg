@@ -1,20 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" fill="none">
-  <title>gfot — One project. Keep going.</title>
-  <desc>A blue and white banner for gfot, a unified workspace for AI coding connections.</desc>
-  <rect x="1" y="1" width="1198" height="318" rx="24" fill="#F5F8FF" stroke="#E1E9FA" stroke-width="2"/>
-  <path d="M904 1V319M1000 1V319M1096 1V319M808 1V319M808 80H1199M808 160H1199M808 240H1199" stroke="#E7EDFA"/>
-  <rect x="64" y="48" width="64" height="64" rx="18" fill="#2862F5"/>
-  <text x="96" y="94" fill="white" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif" font-size="54" font-weight="700">g</text>
-  <text x="147" y="98" fill="#172A4A" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif" font-size="54" font-weight="750" letter-spacing="-2">gfot</text>
-  <text x="64" y="177" fill="#172A4A" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif" font-size="40" font-weight="650" letter-spacing="-1">One project. Keep going.</text>
-  <text x="66" y="220" fill="#526887" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,PingFang SC,sans-serif" font-size="22">一个项目，接着做下去。</text>
-  <text x="66" y="274" fill="#2862F5" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif" font-size="13" font-weight="600" letter-spacing="2">LOCAL FOLDERS  /  MODEL CHOICE</text>
-  <rect x="856" y="88" width="256" height="144" rx="16" fill="white" stroke="#D8E3FA" stroke-width="2"/>
-  <path d="M856 124H1112" stroke="#E1E9FA"/>
-  <circle cx="876" cy="106" r="4" fill="#B9C9E5"/>
-  <circle cx="890" cy="106" r="4" fill="#B9C9E5"/>
-  <circle cx="904" cy="106" r="4" fill="#B9C9E5"/>
-  <path d="M881 153H981M881 168H1027M881 183H999" stroke="#D8E3FA" stroke-width="5" stroke-linecap="round"/>
-  <path d="M881 211H1017" stroke="#2862F5" stroke-width="5" stroke-linecap="round"/>
-  <circle cx="1084" cy="211" r="6" fill="#2862F5"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" fill="none">
+<title>gfot — One project. Keep going.</title>
+<desc>gfot's cobalt and cyan identity. 一个项目，接着做下去。</desc>
+<rect x="1" y="1" width="1198" height="338" rx="24" fill="#FAFCFF" stroke="#E5ECF4" stroke-width="2"/>
+<g transform="translate(76 52) scale(1.2)">
+  <path fill="#2862F5" fill-rule="evenodd" d="M112 0h-12c-5 0-9 4-10 9C82 5 73 3 64 3 30 3 4 29 4 63s26 59 60 59l56-36V8c0-5-3-8-8-8ZM64 38a25 25 0 1 1 0 50 25 25 0 0 1 0-50Z"/>
+  <path fill="#22CBE5" d="m120 99-33 22c-2 16-10 24-27 24H43c-9 0-16-6-16-15v-5c0-5-3-7-7-7-12 0-20 11-20 25 0 23 18 37 41 37h19c37 0 60-26 60-60V99Z"/>
+</g>
+<text x="275" y="169" fill="#14213D" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="137" letter-spacing="-8">gfot</text>
+<text x="280" y="224" fill="#526079" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif" font-size="25" letter-spacing="-.4">One project. Keep going.</text>
+<path d="M280 271H432" stroke="#2862F5" stroke-width="3"/>
+<path d="M432 271H484" stroke="#22CBE5" stroke-width="3"/>
+<text x="1116" y="78" text-anchor="end" fill="#526079" font-family="Arial,Helvetica,sans-serif" font-size="12" letter-spacing="2">PROJECTS / AGENT CONNECTIONS</text>
+<text x="1116" y="279" text-anchor="end" fill="#14213D" font-family="-apple-system,BlinkMacSystemFont,PingFang SC,sans-serif" font-size="24">一个项目，接着做下去。</text>
 </svg>

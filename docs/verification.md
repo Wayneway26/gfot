@@ -30,3 +30,9 @@ Python 3.12/3.13 is an external requirement for optimization, not bundled. Snaps
 Review fixes additionally cover the upstream context/ folder layout, identical system-prompt installation for probes/adoption, deletion-only changes and explicit oversized-evidence failure instead of trajectory truncation.
 
 The final packaged app passed again after review fixes. Both Standards and Spec review axes completed targeted follow-up with no remaining findings. The synthetic native workflow report is in [h2-ui-check.json](h2-ui-check.json).
+
+## Visual identity update — 2026-10-21
+
+gfot 0.5.0-h2.2 applies the cobalt/cyan vector identity to the README, desktop UI and macOS icon. Syntax checks and the source Electron smoke passed. The packaged Electron smoke also passed, including real Harness²/OpenCode synthetic-model execution, model connection switching, SVG loading and an 840px-wide composer overflow check. Welcome, task, compact and settings layouts were inspected visually. The README screenshots are captures of the new client, not mockups.
+
+[Packaged UI report](brand/ui-check.json). This visual update used no real account credentials or paid model calls. The earlier 83-test full-suite result above predates this styling patch; the full suite was not rerun for this patch.

@@ -2,10 +2,8 @@
 
 <img src="docs/readme-hero.svg" alt="gfot — 一个项目，接着做下去。One project. Keep going." width="100%" />
 
-**一个客户端，管理你的 AI 编程连接。**<br />
-本地项目、任务对话、账号与模型连接，都在这里。
-
-One desktop workspace for your AI coding connections.
+**一个工作区，让任务接着走。**<br />
+项目、Agent 连接与执行过程，统一在这里。
 
 [English](README.md) · **简体中文**
 
@@ -29,7 +27,7 @@ One desktop workspace for your AI coding connections.
 
 执行循环使用内置的 **OpenCode**，模型和账号由你选择。运行桌面客户端无需另外安装 Codex 或 OpenCode；如果选择导入 Codex 凭证，则需要已有的 Codex 登录文件。
 
-| 项目留在这里 | 模型由你选择 | 操作由你批准 |
+| 上下文留在这里 | 连接由你选择 | 操作由你批准 |
 | --- | --- | --- |
 | 本地目录、持久化对话、可查看的执行记录。 | Codex 凭证导入、HTTPS API、CC Switch 路由与本机模型。 | 审批文件修改和命令，回答执行中的问题，随时停止。 |
 

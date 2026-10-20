@@ -2,10 +2,8 @@
 
 <img src="docs/readme-hero.svg" alt="gfot — One project. Keep going. 一个项目，接着做下去。" width="100%" />
 
-**One desktop workspace for your AI coding connections.**<br />
-One client. Your local projects, accounts and model connections.
-
-一个客户端，管理本地项目、任务对话与 AI 编程连接。
+**One workspace. Keep your task moving.**<br />
+Local projects, AI connections, and execution you can follow.
 
 **English** · [简体中文](README.zh-CN.md)
 
@@ -31,7 +29,7 @@ The longer-term goal is a common task entry point for the local Agent ecosystem,
 
 The execution loop is bundled **OpenCode**. You choose the models and accounts it connects to; you do not need a separate Codex or OpenCode application to run the desktop client. Importing existing Codex credentials requires an existing Codex login file.
 
-| Your workspace | Your connections | Your approval |
+| Keep your context | Choose your connections | Approve the actions |
 | --- | --- | --- |
 | Local folders, persistent conversations and a visible execution timeline. | Codex credential import, HTTPS APIs, CC Switch routes and local models. | Review file edits and commands, answer questions, or stop a run. |
 

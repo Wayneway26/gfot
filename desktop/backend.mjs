@@ -10,7 +10,7 @@ import {listModels,verifyConnection} from './connections.mjs';
 import {createAccountManager} from './accounts.mjs';
 import {startAccountProxy,verifyResponses} from './account-proxy.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
-const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
+const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/brand-mark.svg':'brand-mark.svg'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
 export async function startDesktopServer({dataDir,binary,key,harnessRunner,connectionFetch=fetch,accountFetch=fetch,engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;
@@ -93,7 +93,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    if(!bearer&&!matches(cookie,auth))return send(401,{error:'请从 gfot 桌面应用访问'});
    if(req.headers.origin&&req.headers.origin!==origin)return send(403,{error:'请求来源不允许'});
    const path=new URL(req.url,origin).pathname;
-   if(req.method==='GET'&&files[path]){if(bearer)res.setHeader('Set-Cookie',`gfot=${auth}; HttpOnly; SameSite=Strict; Path=/`);res.setHeader('content-type',({'.html':'text/html','.js':'text/javascript','.css':'text/css'})[extname(files[path])]+'; charset=utf-8');return res.end(readFileSync(join(publicDir,files[path])));}
+   if(req.method==='GET'&&files[path]){if(bearer)res.setHeader('Set-Cookie',`gfot=${auth}; HttpOnly; SameSite=Strict; Path=/`);res.setHeader('content-type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml'})[extname(files[path])]+'; charset=utf-8');return res.end(readFileSync(join(publicDir,files[path])));}
    if(req.method==='GET'&&path==='/api/state')return send(200,view());
    if(req.method==='GET'&&path==='/api/events'){res.writeHead(200,{'content-type':'text/event-stream','connection':'keep-alive'});res.write('event: state\ndata: '+JSON.stringify(view())+'\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;}
    if(req.method!=='POST')return send(404,{error:'未找到该操作'});
