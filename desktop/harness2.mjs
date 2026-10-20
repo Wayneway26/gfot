@@ -1,6 +1,6 @@
 import {spawn,execFileSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
-import {readFileSync,writeFileSync,readdirSync,lstatSync,mkdirSync,realpathSync} from 'node:fs';
+import {readFileSync,writeFileSync,readdirSync,lstatSync,mkdirSync,realpathSync,cpSync} from 'node:fs';
 import {join,relative,extname,isAbsolute,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline';
@@ -33,7 +33,7 @@ export function harnessStatus(runnerPath=runner){
 }
 const excluded=new Set(['node_modules','dist','build','data','vendor','venv','__pycache__','target','coverage']);
 const extensions=new Set(['.js','.mjs','.cjs','.ts','.tsx','.jsx','.py','.json','.md','.html','.css','.scss','.toml','.yml','.yaml','.txt','.sh','.go','.rs','.java','.sql']);
-export function projectSnapshot(folder){
+export function projectSnapshot(folder,{allowEmpty=false}={}){
  const root=realpathSync(folder),files=[];let bytes=0;
  const walk=(dir)=>{for(const item of readdirSync(dir,{withFileTypes:true})){
   const name=item.name;if(name.startsWith('.')||excluded.has(name)||name==='desktop.json'||/auth|credential|secret|token|password|\.pem$|\.key$|lock\.json$|lock\.yaml$/i.test(name))continue;
@@ -42,7 +42,7 @@ export function projectSnapshot(folder){
   const content=readFileSync(path);if(content.includes(0))continue;bytes+=content.length;
   if(files.length>=200||bytes>2000000)throw new InputError('项目文本快照超过 200 文件或 2 MB，请选择较小的子项目');
   files.push({path:relative(root,path),content:content.toString('utf8')});
- }};walk(root);if(!files.length)throw new InputError('目录没有可用于 Harness² 探测的文本源文件');return files;
+ }};walk(root);if(!files.length&&!allowEmpty)throw new InputError('目录没有可用于 Harness² 探测的文本源文件');return files;
 }
 function writeSnapshot(files,dir){mkdirSync(dir,{recursive:true,mode:0o700});for(const file of files){const path=join(dir,file.path);mkdirSync(join(path,'..'),{recursive:true,mode:0o700});writeFileSync(path,file.content,{mode:0o600});}}
 function parseProposal(text){
@@ -72,17 +72,19 @@ export class Harness2Engine{
  async handle(message){
   if(this.cancelled)throw Error('Stopped');if(++this.sessions>10)throw Error('Harness² 达到 10 次会话上限');
   if(!['execute','propose'].includes(message.action)||typeof message.label!=='string'||!/^[a-z0-9.]+$/i.test(message.label))throw Error('Invalid stage');
-  const proposer=message.action==='propose';let folder,prompt;
+  const proposer=message.action==='propose';let folder,prompt,systemPrompt;
   if(proposer){
-   folder=realpathSync(message.contextDir);const rel=relative(this.root,folder);if(!rel||rel.startsWith('..')||isAbsolute(rel))throw Error('Invalid context directory');
+   const context=realpathSync(message.contextDir),rel=relative(this.root,context);if(!rel||rel.startsWith('..')||isAbsolute(rel))throw Error('Invalid context directory');
+   folder=join(this.root,'editors',message.label);mkdirSync(folder,{recursive:true,mode:0o700});cpSync(context,join(folder,'context'),{recursive:true});
    prompt=message.mission+'\n\nGFOT OUTPUT CONTRACT: Do not edit files or run commands. Read the context files. Reply only with JSON {"harness": {"systemprompt.md":"...", "guardrails.md":"...", "LongTermMEMORY.md":"...", "tool_descriptions/tool_guidance.md":"..."}, "notes":"evidence-based rationale"}. Return all four text files, no scripts, plugins, permissions or subagents. Keep combined text under 24000 characters.';
   }else{
    folder=join(this.root,'probes',message.label);writeSnapshot(this.snapshot,folder);
-   prompt='This is an isolated Harness² probe copy. Do not access the original project or any external directory.\n\n'+harnessPrompt(message.harness)+'\n\nUser task:\n'+this.prompt;
+   systemPrompt=harnessPrompt(message.harness);
+   prompt='This is an isolated Harness² probe copy. Do not access the original project or any external directory.\n\nUser task:\n'+this.prompt;
   }
   this.onPhase({label:message.label,action:message.action,sessions:this.sessions,files:this.snapshot.length});
   const subtask={id:this.task.id+'-h2-'+this.id+'-'+this.sessions,title:'Harness² '+message.label,folder,sessionId:null};
-  const engine=this.current=this.engineFactory({binary:this.binary,dataDir:this.dataDir,task:subtask,profile:this.profile,key:this.key,readOnly:proposer,maxSteps:16,onEvent:event=>{if(this.current===engine&&!this.cancelled)this.onEvent(event);}});
+  const engine=this.current=this.engineFactory({binary:this.binary,dataDir:this.dataDir,task:subtask,profile:this.profile,key:this.key,readOnly:proposer,systemPrompt,maxSteps:16,onEvent:event=>{if(this.current===engine&&!this.cancelled)this.onEvent(event);}});
   const timeout=setTimeout(()=>{this.sessionError='Harness² 单次会话超过 3 分钟';void engine.stop();},180000);
   try{
    await engine.start();if(this.cancelled)throw Error('Stopped');
@@ -90,8 +92,11 @@ export class Harness2Engine{
    const history=await engine.history();const text=history.filter(m=>m.info?.role==='assistant').flatMap(m=>m.parts||[]).filter(p=>p.type==='text').map(p=>p.text||'').join('\n');
    if(this.cancelled||!text.trim())throw Error('Harness² 会话没有完整回答');
    if(proposer)return this.redact(parseProposal(text));
-   const changes=[];for(const f of projectSnapshot(folder)){const original=this.snapshot.find(p=>p.path===f.path);if(!original||original.content!==f.content)changes.push(f.path);}
-   return this.redact({answer:text.slice(-30000),trajectory:JSON.stringify({changedFiles:changes,messages:history}).slice(-150000)});
+   const before=new Map(this.snapshot.map(f=>[f.path,f.content])),after=new Map(projectSnapshot(folder,{allowEmpty:true}).map(f=>[f.path,f.content])),changes=[];
+   for(const path of new Set([...before.keys(),...after.keys()]))if(before.get(path)!==after.get(path))changes.push({path,change:!after.has(path)?'deleted':!before.has(path)?'added':'modified'});
+   const evidence=this.redact({answer:text,trajectory:JSON.stringify({changes,messages:history},null,2)});
+   if(Buffer.byteLength(JSON.stringify(evidence),'utf8')>1500000)throw new InputError('候选执行证据超过 1.5 MB，停止此候选，避免静默丢失执行事件');
+   return evidence;
   }finally{clearTimeout(timeout);await engine.stop();if(this.current===engine)this.current=null;}
  }
  send(){return this.done;}

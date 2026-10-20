@@ -128,7 +128,7 @@ def main():
           "answer": adapter.deliverable_text(final.run_dir) if final.ok else "",
           "candidates": [{"label": k, "ok": v.ok, "delivered": v.delivered,
                           "error": v.error,
-                          "answer": adapter.deliverable_text(v.run_dir)[:8000] if v.ok else "",
+                          "answerExcerpt": adapter.deliverable_text(v.run_dir)[:8000] if v.ok else "",
                           "trajectoryExcerpt": adapter.trajectory(v.run_dir, obs_trunc=50000)[:12000] if v.ok else ""}
                          for k, v in result.rollouts.items()]})
 

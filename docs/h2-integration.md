@@ -23,3 +23,5 @@ See [UPSTREAM.json](../desktop/vendor/harness2/UPSTREAM.json) for the pinned com
 4. Explicitly adopt a successful configuration, then run the real task normally. Adoption is per task; it can be cleared.
 
 First-run Python discovery checks PATH, common Homebrew/Miniconda locations and optional GFOT_PYTHON. The app reports missing Python and preserves ordinary execution. Desktop approvals are not an OS sandbox; an approved command can still access paths outside the snapshot. Snapshot filters are not a guarantee that source files contain no secrets. Upstream cost fields are not populated by this adapter and must not be interpreted as free usage.
+
+Each proposal uses the upstream context/ wrapper layout. Probed and adopted harnesses are both installed as OpenCode agent.build.prompt. Deletions enter evidence explicitly; combined rollout evidence above 1.5 MB fails that rollout rather than truncating events silently. UI trajectory/answer excerpts are bounded views of the complete successful rollout records.

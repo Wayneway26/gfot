@@ -138,6 +138,8 @@ User task → explicit optimization consent
 - Inspect candidate answers, trajectory excerpts and configuration notes in the task panel. A successful composed run enables **确认采用配置**; adoption persists only for later normal turns in that task and can be cleared. Completion does not prove an improvement in task quality.
 - Python sources ship separately from the Electron archive, with the upstream license and commit/file-hash manifest. No benchmark setup or external Harness² checkout is needed. Set `GFOT_PYTHON` to a Python 3.12/3.13 executable if discovery fails, then restart the app.
 
+![Harness² task-level refinement with synthetic model responses](docs/harness2-preview.png)
+
 The inner tool loop remains **OpenCode**. Cross-task automatic reflection, the experience library, parallel recursion and deeper `k>1` optimization are not implemented in this first integration. [Integration contract and upstream pin](docs/h2-integration.md).
 
 ## Local data and permissions
@@ -157,7 +159,7 @@ npm test
 npm run test:ui
 ```
 
-**82 automated tests passed locally**, including real OpenCode execution against synthetic model servers, approved temporary file writes, tool-result return, same-conversation account switching, credential encryption/redaction, refresh races and cancellation.
+**83 automated tests passed locally**, including real OpenCode execution against synthetic model servers, approved temporary file writes, tool-result return, same-conversation account switching, credential encryption/redaction, refresh races and cancellation.
 
 The Harness² additions test the real upstream Python core, source filtering, failure/fallback accounting, cancellation, explicit adoption and vendored source hashes. Native UI tests additionally run the workflow through real OpenCode with synthetic models.
 

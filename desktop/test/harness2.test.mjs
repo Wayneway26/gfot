@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,symlinkSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,symlinkSync,rmSync,unlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomBytes,createHash} from 'node:crypto';
@@ -27,8 +27,8 @@ test('real Harness2 core produces a 4/3 ledger, keeps probes separate and requir
  let service,calls=0,release,normalOptions;const options=[];
  const engineFactory=o=>{options.push(o);let text='';return {
   async start(){o.task.sessionId='s'+options.length;},
-  async send(prompt){calls++;if(o.readOnly){text=JSON.stringify({harness:{...defaultHarness,'systemprompt.md':'Inspect the task and verify the result.'},notes:'Observed probe evidence '+o.key});}
-   else if(o.task.title.startsWith('Harness²')){o.onEvent({type:'permission.asked',properties:{id:'approval-'+calls,sessionID:o.task.sessionId,permission:'edit',patterns:['value.txt']}});await new Promise(r=>release=r);writeFileSync(join(o.task.folder,'value.txt'),'probe only');text='Completed isolated work';}
+  async send(prompt){calls++;if(o.readOnly){assert.ok(readFileSync(join(o.task.folder,'context/harness/systemprompt.md'),'utf8'));text=JSON.stringify({harness:{...defaultHarness,'systemprompt.md':'Inspect the task and verify the result.'},notes:'Observed probe evidence '+o.key});}
+   else if(o.task.title.startsWith('Harness²')){o.onEvent({type:'permission.asked',properties:{id:'approval-'+calls,sessionID:o.task.sessionId,permission:'edit',patterns:['value.txt']}});await new Promise(r=>release=r);if(calls===1)unlinkSync(join(o.task.folder,'value.txt'));else writeFileSync(join(o.task.folder,'value.txt'),'probe only');text='Completed isolated work';}
    else{normalOptions=o;text='normal work';}return {info:{}};},
   async history(){return [{info:{id:'a',role:'assistant'},parts:[{type:'text',text}]}];},
   async permission(){release();},async question(){},async stop(){release?.();},
@@ -45,13 +45,13 @@ test('real Harness2 core produces a 4/3 ledger, keeps probes separate and requir
    if(task.pending.length)await call('tasks/'+taskId+'/permission',{id:task.pending[0].id,reply:'once'});await sleep(10);
   }
   assert.equal(task.status,'idle',task.error);assert.equal(task.harnessRun.status,'ready',JSON.stringify(task.harnessRun.result));assert.equal(task.harnessRun.result.successful,true);
-  assert.equal(task.harnessRun.result.method.ledger.R,4);assert.equal(task.harnessRun.result.method.ledger.P,3);assert.equal(calls,7);
+  assert.equal(task.harnessRun.result.method.ledger.R,4);assert.equal(task.harnessRun.result.method.ledger.P,3);assert.equal(calls,7);assert.match(task.harnessRun.result.candidates[0].trajectoryExcerpt,/\"change\": \"deleted\"/);const probedPrompt=options.find(o=>o.task.title==='Harness² c1').systemPrompt;
   assert.equal(readFileSync(join(folder,'value.txt'),'utf8'),'original');assert.equal(new Set(options.filter(o=>!o.readOnly).map(o=>o.task.folder)).size,4);
   assert.equal((await call('tasks/'+taskId+'/harness-adopt',{consent:false,runId:task.harnessRun.runId})).status,400);
   assert.equal((await call('tasks/'+taskId+'/harness-adopt',{consent:true,runId:'stale'})).status,400);
   const visible=(await call('state')).body;assert.ok(!JSON.stringify(visible).includes('test-credential-never-publish'));
   await call('tasks/'+taskId+'/harness-adopt',{consent:true,runId:task.harnessRun.runId});assert.equal(task.harnessRun.status,'adopted');
-  await call('tasks/'+taskId+'/prompt',{text:'Continue'});await until(()=>task.status==='idle');assert.match(normalOptions.systemPrompt,/Inspect the task/);
+  await call('tasks/'+taskId+'/prompt',{text:'Continue'});await until(()=>task.status==='idle');assert.match(normalOptions.systemPrompt,/Inspect the task/);assert.equal(normalOptions.systemPrompt,probedPrompt);
   await call('tasks/'+taskId+'/harness-clear',{});assert.equal(task.adoptedHarness,undefined);
   assert.ok(!JSON.stringify(task.harnessRun.result).includes('test-credential-never-publish'));
  }finally{await service?.close();rmSync(dir,{recursive:true,force:true});}
@@ -82,5 +82,12 @@ test('failed proposal sessions remain visible as upstream fallbacks and cannot c
  const dir=mkdtempSync(join(tmpdir(),'gfot-h2-fallback-'));mkdirSync(join(dir,'data'));mkdirSync(join(dir,'project'));writeFileSync(join(dir,'project/source.txt'),'source');
  const engine=new Harness2Engine({binary:'/synthetic',dataDir:join(dir,'data'),task:{id:'fallback-test',folder:join(dir,'project')},prompt:'fixture',profile:{},key:'',onPhase(){},onEvent(){},engineFactory:o=>({async start(){},async send(){return {info:{}};},async history(){return [{info:{role:'assistant'},parts:[{type:'text',text:o.readOnly?'invalid proposal':'completed fixture'}]}];},async stop(){}})});
  try{await engine.start();const result=await engine.send();assert.equal(result.successful,false);assert.deepEqual(result.method.fell_back,['inv1','dom1','c1']);assert.equal(result.method.ledger.R,4);assert.equal(result.costsKnown,false);}
+ finally{await engine.stop();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('oversized rollout evidence fails explicitly rather than silently dropping trajectory events',{skip:!available,timeout:15000},async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'gfot-h2-evidence-'));mkdirSync(join(dir,'data'));mkdirSync(join(dir,'project'));writeFileSync(join(dir,'project/source.txt'),'source');
+ const engine=new Harness2Engine({binary:'/synthetic',dataDir:join(dir,'data'),task:{id:'large-test',folder:join(dir,'project')},prompt:'fixture',profile:{},key:'',onPhase(){},onEvent(){},engineFactory:()=>({async start(){},async send(){return {info:{}};},async history(){return [{info:{role:'assistant'},parts:[{type:'text',text:'x'.repeat(1600000)}]}];},async stop(){}})});
+ try{await engine.start();await assert.rejects(engine.send(),/1.5 MB/);assert.equal(engine.result,null);}
  finally{await engine.stop();rmSync(dir,{recursive:true,force:true});}
 });

@@ -3,9 +3,9 @@
 Date: 2026-10-20. Host: macOS / Apple silicon. gfot 0.5.0-h2.1.
 
 - Syntax checks: passed.
-- Full automated suite: 82 passed, zero failures or skips.
+- Full automated suite: 83 passed, zero failures or skips.
 - Source Electron UI smoke: passed with real upstream Harness² and real OpenCode, using a synthetic local model.
-- Packaged UI smoke: pending final validation.
+- Packaged UI smoke: passed. Python loads from independent app resources; real Harness² + real OpenCode complete optimization, explicit adoption and a subsequent normal turn with synthetic local models.
 
 ## Harness² coverage
 
@@ -26,3 +26,7 @@ Existing tests exercise authenticated desktop APIs, encrypted/redacted credentia
 The earlier explicitly authorized Codex-import diagnostic passed model discovery, Responses inference and function-result return with one real account. That diagnostic predates this Harness² integration. No real account or paid model was used for this branch's tests. Model quality improvement, real-provider multi-stage optimization, browser OAuth, quota responses, real cross-account execution, other Agent runtimes and Harness² cross-task reflection/library are not verified.
 
 Python 3.12/3.13 is an external requirement for optimization, not bundled. Snapshot copies and tool approvals are not an OS sandbox. Automated native file selection uses a simulated dialog, while preload/main IPC, file parsing and encrypted storage are real. Builds remain unsigned/unnotarized; Intel Mac is not validated.
+
+Review fixes additionally cover the upstream context/ folder layout, identical system-prompt installation for probes/adoption, deletion-only changes and explicit oversized-evidence failure instead of trajectory truncation.
+
+The final packaged app passed again after review fixes. Both Standards and Spec review axes completed targeted follow-up with no remaining findings. The synthetic native workflow report is in [h2-ui-check.json](h2-ui-check.json).
