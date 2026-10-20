@@ -126,3 +126,5 @@ dialog .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
 #composer:focus-within{border-color:#9dbaff;box-shadow:0 0 0 3px #2563eb08}
 input[type=checkbox]{accent-color:var(--accent)}
 dialog .primary{box-shadow:none}
+
+.account-entry{display:flex;gap:8px;margin:18px 0}.account-entry button{font-size:11px}.account-actions{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;max-width:150px}.connection-title{font-size:13px;margin:26px 0 5px}.account-row>div:first-child{max-width:300px}.account-row strong{font-weight:550}.account-actions button{padding:5px 8px}#account-model-note{font-size:10px;color:var(--muted);display:block;margin-top:8px}

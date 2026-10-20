@@ -1,6 +1,6 @@
-const {app,BrowserWindow,ipcMain,dialog,utilityProcess,safeStorage,Menu}=require('electron');
+const {app,BrowserWindow,ipcMain,dialog,utilityProcess,safeStorage,Menu,shell}=require('electron');
 const {join}=require('node:path');
-const {readFileSync,writeFileSync,mkdirSync,existsSync}=require('node:fs');
+const {readFileSync,writeFileSync,mkdirSync,existsSync,statSync}=require('node:fs');
 const {randomBytes}=require('node:crypto');
 app.setName('gfot');
 let window,worker,base,quitting=false;
@@ -14,6 +14,22 @@ function masterKey(dir){
 }
 function trusted(event){if(!base||event.sender!==window?.webContents||!event.senderFrame?.url.startsWith(base+'/'))throw Error('Untrusted frame');}
 ipcMain.handle('gfot:folder',async event=>{trusted(event);const result=await dialog.showOpenDialog(window,{title:'选择项目目录',properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0];});
+async function serviceCall(path,input){
+ const response=await fetch(base+'/api/'+path,{method:'POST',headers:{authorization:'Bearer '+worker.auth,'content-type':'application/json'},body:JSON.stringify(input)});
+ const data=await response.json();if(!response.ok)throw Error(data.error||'本地账号操作失败');return data;
+}
+ipcMain.handle('gfot:import-codex',async event=>{
+ trusted(event);const result=await dialog.showOpenDialog(window,{title:'选择你授权 gfot 导入的 Codex auth.json（不修改原文件）',defaultPath:join(app.getPath('home'),'.codex','auth.json'),properties:['openFile','showHiddenFiles'],filters:[{name:'JSON credential file',extensions:['json']}]});
+ if(result.canceled)return null;const path=result.filePaths[0];if(statSync(path).size>90000)throw Error('凭证文件过大，拒绝导入');
+ return serviceCall('accounts/import',{document:readFileSync(path,'utf8')});
+});
+ipcMain.handle('gfot:chatgpt-login',async(event,accountId)=>{
+ trusted(event);const result=await serviceCall('accounts/login/start',{...(typeof accountId==='string'?{accountId}:{})});
+ const url=new URL(result.authorizationURL);if(url.origin!=='https://auth.openai.com'||url.pathname!=='/api/accounts/authorize')throw Error('不可信的授权地址');
+ try{await shell.openExternal(url.href);}catch{await serviceCall('accounts/login/cancel',{id:result.id});throw Error('无法打开浏览器，请重试');}
+ return {id:result.id};
+});
+
 function createWindow(){
  window=new BrowserWindow({width:1240,height:820,minWidth:840,minHeight:600,title:'gfot',backgroundColor:'#ffffff',titleBarStyle:'hiddenInset',trafficLightPosition:{x:20,y:20},webPreferences:{preload:join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
  window.webContents.setWindowOpenHandler(()=>({action:'deny'}));

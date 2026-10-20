@@ -1,6 +1,6 @@
 const $=s=>document.querySelector(s);
 const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let state={tasks:[],profiles:[]},selected=localStorage.getItem('gfot-task'),rendered=null,messageSignature='',approvalSignature='';
+let state={tasks:[],profiles:[],accounts:[]},selected=localStorage.getItem('gfot-task'),rendered=null,messageSignature='',approvalSignature='';
 const labels={idle:'等待任务',starting:'启动中',running:'执行中',permission:'等待确认',error:'执行出错',stopped:'已停止',interrupted:'上次执行中断'};
 const busy=task=>task&&['starting','running','permission'].includes(task.status);
 async function api(path,body){const r=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Error(data.error||'请求失败');return data;}
@@ -16,12 +16,16 @@ const presets={
  deepseek:{label:'DeepSeek API',mode:'direct',baseURL:'https://api.deepseek.com',model:''},
  ollama:{label:'本机 Ollama',mode:'local',baseURL:'http://127.0.0.1:11434/v1',model:''},
  proxy:{label:'本机模型代理',mode:'local',baseURL:'http://127.0.0.1:8080/v1',model:''},
+ ccswitch:{label:'CC Switch Codex 路由',mode:'local',baseURL:'http://127.0.0.1:15721/v1',model:'',protocol:'responses'},
+ ccswitchClaude:{label:'CC Switch Claude 路由',mode:'local',baseURL:'http://127.0.0.1:15721/v1',model:'',protocol:'anthropic'},
 };
 function editProfile(profile,after){
+ if(profile?.mode==='account')return bindAccount(state.accounts.find(a=>a.id===profile.accountId),profile,after);
  const mode=profile?.mode||'local';
  modal(profile?'编辑模型连接':'连接你的模型','支持 OpenAI Chat Completions 兼容服务。API 直连无需另外安装代理；API Key 与订阅登录凭证不同。',
  `<label>快速填写<select id="connection-preset"><option value="existing">${profile?'保留当前配置':'选择服务…'}</option>${Object.entries(presets).map(([id,p])=>`<option value="${id}">${escape(p.label)}</option>`).join('')}</select></label>`+
  `<label>连接方式<select name="mode"><option value="local" ${mode==='local'?'selected':''}>本机服务（HTTP 回环地址）</option><option value="direct" ${mode==='direct'?'selected':''}>HTTPS API 直连（使用自己的 API Key）</option></select></label>`+
+ `<label>接口协议<select name="protocol"><option value="chat" ${(profile?.protocol||'chat')==='chat'?'selected':''}>OpenAI Chat Completions</option><option value="responses" ${profile?.protocol==='responses'?'selected':''}>OpenAI Responses（含 Codex 反代）</option><option value="anthropic" ${profile?.protocol==='anthropic'?'selected':''}>Anthropic Messages（含 Claude 路由）</option></select></label>`+
  field('label','连接名称',profile?.label||'我的模型')+field('baseURL','Base URL',profile?.baseURL||'','url','如 https://your-service.example/v1')+
  field('apiKey',profile?.hasKey?'访问密钥（留空保留，钥匙串保护）':'API Key（本机服务不要求时可留空）','','password')+
  (profile?.hasKey?'<label class="check"><input type="checkbox" name="clearKey" value="yes">清除旧密钥（HTTPS 直连需重新填写）</label>':'')+
@@ -29,7 +33,7 @@ function editProfile(profile,after){
  field('model','模型 ID',profile?.model||'','text','选择支持工具调用的模型')+'<datalist id="available-models"></datalist>',
  '保存连接',async(values,form)=>{state=await api('profiles',{...values,clearKey:values.clearKey==='yes',...(profile?{id:profile.id}:{})});render();if(form.isConnected&&$('#modal-form')===form){$('#dialog').close();if(after)await after();}});
  const form=$('#modal-form'),model=form.elements.model;model.setAttribute('list','available-models');
- $('#connection-preset').onchange=event=>{const p=presets[event.target.value];if(!p)return;for(const field of ['mode','label','baseURL','model'])form.elements[field].value=p[field];form.elements.apiKey.value='';if(form.elements.clearKey)form.elements.clearKey.checked=true;$('#available-models').innerHTML='';$('#model-discovery-note').textContent='请填写此服务的密钥，再读取模型列表';};
+ $('#connection-preset').onchange=event=>{const p=presets[event.target.value];if(!p)return;for(const field of ['mode','label','baseURL','model'])form.elements[field].value=p[field];form.elements.protocol.value=p.protocol||'chat';form.elements.apiKey.value='';if(form.elements.clearKey)form.elements.clearKey.checked=true;$('#available-models').innerHTML='';$('#model-discovery-note').textContent='请核对服务显示的地址和密钥，再读取模型列表';};
  $('#load-models').onclick=async event=>{const button=event.target;button.disabled=true;$('#dialog-error').textContent='';try{
   const values=Object.fromEntries(new FormData(form)),snapshot=JSON.stringify(values);const result=await api('connections/models',{...values,clearKey:values.clearKey==='yes',...(profile?{id:profile.id}:{})});
   if(!form.isConnected||$('#modal-form')!==form)return;if(JSON.stringify(Object.fromEntries(new FormData(form)))!==snapshot){$('#model-discovery-note').textContent='配置已变化，请重新读取模型列表';return;}
@@ -39,9 +43,36 @@ function editProfile(profile,after){
  }catch(error){if(form.isConnected&&$('#modal-form')===form)$('#dialog-error').textContent=error.message;}finally{button.disabled=false;}};
 }
 function settings(){
- $('#dialog-body').innerHTML=`<h2>模型连接</h2><p>可直连自己的 HTTPS API，也可连接本机代理或 Ollama。切换在下一回合生效。</p>${state.profiles.map(p=>`<div class="profile-row"><div>${escape(p.label)}<small>${p.mode==='direct'?'HTTPS API':'本机服务'} · ${escape(p.model)}</small><small>${p.verification?.toolCalling?'✓ 推理与工具回传已检查（'+escape(new Date(p.verification.at).toLocaleDateString())+'）':'尚未完成推理与工具检查'}</small></div><div><button data-verify-profile="${p.id}">验证可用性</button> <button data-edit-profile="${p.id}">编辑</button></div></div>`).join('')||'<p>先添加一个模型连接；密钥仅在本机加密保存。</p>'}<div class="actions"><button id="settings-close">关闭</button><button class="primary" id="add-profile">添加连接</button></div>`;
+ const accountRows=(state.accounts||[]).map(a=>`<div class="profile-row account-row"><div><strong>${escape(a.label)}</strong><small>${a.source==='chatgpt'?'ChatGPT 独立授权':'Codex 本地凭证副本'} · ${escape(a.status)}</small><small>${a.expiresAt?'访问凭证到期：'+escape(new Date(a.expiresAt).toLocaleString()):''}</small><small>${a.inferenceAt?'✓ 曾完成推理 · '+escape(new Date(a.inferenceAt).toLocaleString()):'仅有凭证，尚未验证推理'}</small></div><div class="account-actions"><button data-use-account="${a.id}">选模型</button><button data-quota-account="${a.id}">查额度</button>${a.source==='chatgpt'?`<button data-login-account="${a.id}">重新登录</button>`:''}${a.hasCredentials?`<button data-logout-account="${a.id}">退出</button>`:''}</div></div>`).join('');
+ $('#dialog-body').innerHTML=`<h2>账号与模型连接</h2><p class="experimental-note">订阅账号接入为实验功能。Codex 导入已做单账号诊断，独立 ChatGPT 登录仍待真实验收；兼容接口可能随上游变化失效。</p><p>账号凭证在本机加密保存。导入 Codex 只复制访问凭证，不修改原文件，也不轮换共享刷新凭证。独立登录的续期由 gfot 管理。</p><div class="account-entry"><button id="login-chatgpt">Continue with ChatGPT</button><button id="import-codex">导入 Codex 登录</button></div>${accountRows||'<p>尚未添加订阅账号。</p>'}<h3 class="connection-title">任务使用的连接</h3><p>同一任务可在回合之间切换账号连接或 API 连接；遇到限额不会自动重放已经执行的操作。</p>${state.profiles.map(p=>`<div class="profile-row"><div>${escape(p.label)}<small>${p.mode==='account'?'订阅账号':p.mode==='direct'?'HTTPS API':'本机服务'} · ${escape(p.model)}</small><small>${p.verification?.toolCalling?'✓ 推理与工具回传已检查（'+escape(new Date(p.verification.at).toLocaleDateString())+'）':'尚未完成推理与工具检查'}</small></div><div><button data-verify-profile="${p.id}">验证可用性</button> <button data-edit-profile="${p.id}">编辑</button></div></div>`).join('')||'<p>从账号选择模型，或添加 API / CC Switch 本机路由。</p>'}<div class="actions"><button id="settings-close">关闭</button><button class="primary" id="add-profile">添加 API / 代理</button></div>`;
  if(!$('#dialog').open)$('#dialog').showModal();$('#settings-close').onclick=()=>$('#dialog').close();$('#add-profile').onclick=()=>editProfile();
+ $('#login-chatgpt').onclick=()=>loginAccount().catch(e=>toast(e.message));$('#import-codex').onclick=async()=>{try{
+  if(!window.gfotDesktop?.importCodex)throw Error('凭证导入需要 macOS 原生客户端');const result=await gfotDesktop.importCodex();if(!result)return;state=await api('state');render();bindAccount(state.accounts.find(a=>a.id===result.accountId));
+ }catch(error){toast(error.message);}};
 }
+async function loginAccount(accountId){
+ if(!window.gfotDesktop?.loginChatGPT)return toast('请在 macOS 客户端登录');
+ const {id}=await gfotDesktop.loginChatGPT(accountId);
+ $('#dialog-body').innerHTML='<h2>在浏览器中完成登录</h2><p>请确认是 OpenAI 的授权页面。gfot 使用自己的注册与回调，授权结果只保存在本机。</p><div id="login-progress" role="status">等待浏览器授权…</div><div class="actions"><button id="cancel-login">取消登录</button></div>';
+ if(!$('#dialog').open)$('#dialog').showModal();const progress=$('#login-progress');
+ $('#cancel-login').onclick=()=>{$('#dialog').close();void api('accounts/login/cancel',{id});};
+ for(let i=0;i<600;i++){
+  if(!progress.isConnected||!$('#dialog').open){await api('accounts/login/cancel',{id});return;}
+  const result=await api('accounts/login/status',{id});
+  if(result.status==='complete'){state=await api('state');render();return bindAccount(state.accounts.find(a=>a.id===result.accountId));}
+  if(result.status!=='pending'){progress.textContent=result.error||'登录已取消';return;}
+  await new Promise(resolve=>setTimeout(resolve,1500));
+ }
+}
+function bindAccount(account,profile,after){
+ if(!account)return toast('账号不存在，请重新选择');
+ modal('选择订阅模型',account.source==='codex-local'?'使用你明确导入的 Codex 访问凭证。读取模型目录、查询额度和推理是不同检查；过期后需重新导入或独立登录。':'使用所选 ChatGPT 注册的订阅权限。选择模型后可检查推理；该登录不会重置或增加账号限额。',
+ `<p><strong>${escape(account.label)}</strong></p>`+field('label','连接名称',profile?.label||account.label)+`<button type="button" id="load-account-models">读取该账号的模型</button><span id="account-model-note"></span>`+field('model','模型 ID',profile?.model||'','text','从当前账号目录选择或手动填写')+'<datalist id="account-models"></datalist>',
+ '保存账号连接',async(values,form)=>{state=await api('profiles',{...values,mode:'account',accountId:account.id,...(profile?{id:profile.id}:{})});render();if(form.isConnected){$('#dialog').close();if(after)await after();}});
+ const form=$('#modal-form');form.elements.model.setAttribute('list','account-models');
+ $('#load-account-models').onclick=async event=>{event.target.disabled=true;try{const result=await api('accounts/models',{id:account.id});if(!form.isConnected)return;$('#account-models').innerHTML=result.models.map(id=>`<option value="${escape(id)}"></option>`).join('');$('#account-model-note').textContent='找到 '+result.models.length+' 个模型；目录不代表已验证推理';if(result.models.length===1&&!form.elements.model.value)form.elements.model.value=result.models[0];form.elements.model.focus();}catch(error){if(form.isConnected)$('#dialog-error').textContent=error.message;}finally{event.target.disabled=false;}};
+}
+
 function verifyProfile(profile){
  modal('验证模型是否可用','检查会向所选服务发送最多两次固定诊断请求，可能消耗你的模型用量。不会读取项目、执行命令或修改文件。',`<p><strong>${escape(profile.label)}</strong> · ${escape(profile.model)}<br>${escape(profile.baseURL)}</p><label class="check"><input type="checkbox" required>我同意发送诊断消息并使用该服务的模型额度</label><div id="verification-result" role="status"></div>`,'开始检查',async(_values,form)=>{
   $('#verification-result').textContent='正在检查模型推理、工具调用与结果回传…';
@@ -51,7 +82,7 @@ function verifyProfile(profile){
 }
 
 async function createTask(){
- if(!state.profiles.length)return editProfile(null,createTask);
+ if(!state.profiles.length){settings();return;}
  let folder='';if(window.gfotDesktop){folder=await window.gfotDesktop.chooseFolder();if(!folder)return;}
  modal('新建项目任务','目录内的相关内容可能发送到你选择的模型服务。每个任务单独保存会话；工具权限不是操作系统沙箱。',`<label>本地项目目录<div class="folder-choice"><input name="folder" required value="${escape(folder)}" placeholder="/Users/you/project"><button type="button" id="choose-folder">选择…</button></div></label>${field('title','任务名称',folder.split('/').pop()||'新任务')}<label>模型连接<select name="profileId">${state.profiles.map(p=>`<option value="${p.id}">${escape(p.label)} · ${escape(p.model)}</option>`).join('')}</select></label><label class="check"><input type="checkbox" required>我允许所选模型处理此项目的相关内容；修改文件和运行命令需另行确认。</label>`,'创建任务',async values=>{const {taskId}=await api('tasks',values);selected=taskId;localStorage.setItem('gfot-task',selected);state=await api('state');$('#dialog').close();render();$('#prompt').focus();});
  $('#choose-folder').onclick=async()=>{if(!window.gfotDesktop)return toast('浏览器预览请手工填写目录；桌面应用支持原生目录选择。');const path=await window.gfotDesktop.chooseFolder();if(path)document.querySelector('[name=folder]').value=path;};
@@ -74,6 +105,6 @@ $('#composer').onsubmit=async event=>{event.preventDefault();const text=$('#prom
 $('#prompt').onkeydown=event=>{if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();$('#composer').requestSubmit();}};
 $('#stop').onclick=()=>api('tasks/'+selected+'/stop',{}).catch(e=>toast(e.message));
 document.addEventListener('keydown',event=>{if(event.metaKey&&event.key==='n'){event.preventDefault();void createTask();}});
-document.addEventListener('click',async event=>{const t=event.target.closest('[data-task]');if(t){selected=t.dataset.task;localStorage.setItem('gfot-task',selected);render();return;}const edit=event.target.closest('[data-edit-profile]');if(edit)return editProfile(state.profiles.find(p=>p.id===edit.dataset.editProfile));const verify=event.target.closest('[data-verify-profile]');if(verify)return verifyProfile(state.profiles.find(p=>p.id===verify.dataset.verifyProfile));const test=event.target.closest('[data-test-profile]');if(test){test.disabled=true;try{const result=await api('profiles/test',{id:test.dataset.testProfile});toast(result.modelListed?'代理可达，模型在列表中；推理与工具调用尚需实际验证。':'代理可达，模型未在列表中。请核对模型 ID。');}catch(e){toast(e.message);}finally{test.disabled=false;}return;}const p=event.target.closest('[data-permission]');if(p){p.disabled=true;try{await api('tasks/'+selected+'/permission',{id:p.dataset.permission,reply:p.dataset.reply});}catch(e){toast(e.message);}finally{p.disabled=false;}return;}});
+document.addEventListener('click',async event=>{const t=event.target.closest('[data-task]');if(t){selected=t.dataset.task;localStorage.setItem('gfot-task',selected);render();return;}const use=event.target.closest('[data-use-account]');if(use)return bindAccount(state.accounts.find(a=>a.id===use.dataset.useAccount));const login=event.target.closest('[data-login-account]');if(login)return loginAccount(login.dataset.loginAccount).catch(e=>toast(e.message));const quota=event.target.closest('[data-quota-account]');if(quota){quota.disabled=true;try{const q=await api('accounts/quota',{id:quota.dataset.quotaAccount});toast(q.supported?[q.primary,q.secondary].filter(Boolean).map(w=>'已使用 '+w.usedPercent+'%'+(w.resetAt?'，重置 '+new Date(w.resetAt*1000).toLocaleString():'')).join(' / '):q.note);}catch(e){toast(e.message);}finally{quota.disabled=false;}return;}const logout=event.target.closest('[data-logout-account]');if(logout){logout.disabled=true;try{const result=await api('accounts/logout',{id:logout.dataset.logoutAccount});state=await api('state');settings();render();toast(result.note);}catch(e){toast(e.message);logout.disabled=false;}return;}const edit=event.target.closest('[data-edit-profile]');if(edit)return editProfile(state.profiles.find(p=>p.id===edit.dataset.editProfile));const verify=event.target.closest('[data-verify-profile]');if(verify)return verifyProfile(state.profiles.find(p=>p.id===verify.dataset.verifyProfile));const test=event.target.closest('[data-test-profile]');if(test){test.disabled=true;try{const result=await api('profiles/test',{id:test.dataset.testProfile});toast(result.modelListed?'代理可达，模型在列表中；推理与工具调用尚需实际验证。':'代理可达，模型未在列表中。请核对模型 ID。');}catch(e){toast(e.message);}finally{test.disabled=false;}return;}const p=event.target.closest('[data-permission]');if(p){p.disabled=true;try{await api('tasks/'+selected+'/permission',{id:p.dataset.permission,reply:p.dataset.reply});}catch(e){toast(e.message);}finally{p.disabled=false;}return;}});
 document.addEventListener('submit',async event=>{if(!event.target.matches('.question-form'))return;event.preventDefault();try{const values=Object.values(Object.fromEntries(new FormData(event.target)));await api('tasks/'+selected+'/question',{id:event.target.dataset.question,answers:values.map(v=>[v])});}catch(e){toast(e.message);}});
 try{state=await api('state');render();const events=new EventSource('/api/events');events.addEventListener('state',event=>{state=JSON.parse(event.data);render();});events.onerror=()=>{$('#status').textContent='本地服务连接中断';};}catch(error){toast('加载失败：'+error.message);}

@@ -12,7 +12,7 @@ async function request(profile, key, path, body, fetchImpl = fetch) {
  try {
   const response = await fetchImpl(profile.baseURL + path, {
    method: body === undefined ? 'GET' : 'POST',
-   headers: {Authorization: 'Bearer ' + (key || 'local-proxy'), ...(body === undefined ? {} : {'content-type': 'application/json'})},
+   headers: {...(profile.protocol==='anthropic'?{'x-api-key':key||'local-proxy','anthropic-version':'2023-06-01'}:{Authorization:'Bearer '+(key||'local-proxy')}), ...(body === undefined ? {} : {'content-type': 'application/json'})},
    body: body === undefined ? undefined : JSON.stringify(body),
    signal: controller.signal, redirect: 'error',
   });

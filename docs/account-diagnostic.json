@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-20",
+  "source": "codex-local",
+  "transport": "Electron Chromium / macOS system proxy",
+  "model": "gpt-6.1-sol",
+  "modelCount": 7,
+  "inference": true,
+  "toolCalling": true,
+  "toolResultRoundTrip": true,
+  "projectFilesSent": false,
+  "sharedRefreshUsed": false,
+  "originalFileUnchanged": true,
+  "scope": "One account, fixed diagnostic only; browser OAuth and real cross-account task execution not validated"
+}

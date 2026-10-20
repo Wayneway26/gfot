@@ -1,23 +1,27 @@
 import http from 'node:http';
-import {randomBytes,timingSafeEqual} from 'node:crypto';
+import {randomBytes,randomUUID,timingSafeEqual} from 'node:crypto';
 import {readFileSync,realpathSync,statSync} from 'node:fs';
 import {join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createStore,publicState,newTask,profileInput,vault,requireText,InputError} from './state.mjs';
 import {OpenCodeEngine} from './engine.mjs';
 import {listModels,verifyConnection} from './connections.mjs';
+import {createAccountManager} from './accounts.mjs';
+import {startAccountProxy,verifyResponses} from './account-proxy.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
 const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
-export async function startDesktopServer({dataDir,binary,key,connectionFetch=fetch,engineFactory=options=>new OpenCodeEngine(options)}){
+export async function startDesktopServer({dataDir,binary,key,connectionFetch=fetch,accountFetch=fetch,engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;
  const state=storage.state;
+ const accounts=createAccountManager({state,vault:secrets,save:storage.save,changed:()=>changed(),credentialsChanged:id=>{accountProxy.revokeAccount(id);for(const p of state.profiles)if(p.accountId===id)delete p.verification;},fetchImpl:accountFetch});
+ const accountProxy=await startAccountProxy({accounts,fetchImpl:accountFetch});
  const safe=value=>{
-  const values=[...state.profiles.map(p=>secrets.open(p.secret)),...Array.from(active.values(),r=>r.engine.password)].filter(Boolean);
+  const values=[...state.profiles.map(p=>secrets.open(p.secret)),...accounts.sensitiveValues(),...Array.from(active.values(),r=>r.engine?.password),...Array.from(active.values(),r=>r.engine?.key)].filter(Boolean);
   const redact=v=>typeof v==='string'?values.reduce((text,secret)=>text.split(secret).join('[redacted]'),v):Array.isArray(v)?v.map(redact):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,item])=>[k,redact(item)])):v;
   return redact(value);
  };
- const view=()=>({...publicState(state),engine:{name:'OpenCode',bundled:!!binary,version:'1.19.3'},harness2:{enabled:false,reason:'首版为普通执行；递归改进尚未集成'},capabilities:{automaticFailover:false,quotaQuery:false}});
+ const view=()=>({...publicState(state),engine:{name:'OpenCode',bundled:!!binary,version:'1.19.3'},harness2:{enabled:false,reason:'首版为普通执行；递归改进尚未集成'},capabilities:{automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
  function changed(){if(closed)return;for(const client of clients)client.write('event: state\ndata: '+JSON.stringify(view())+'\n\n');clearTimeout(timer);timer=setTimeout(storage.save,80);}
  function addEvent(task,event){task.events.push({...event,at:new Date().toISOString()});task.events=task.events.slice(-150);changed();}
  function onEvent(task,event){
@@ -26,7 +30,7 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
   if(properties.part)for(const field of ['id','messageID','sessionID'])if(raw.part[field]!==undefined)properties.part[field]=raw.part[field];
   const draft=value=>{
    const runtime=active.get(task.id);if(!runtime)return;runtime.rawDraft=value.slice(-100000);let hidden=0;
-   for(const secret of [...state.profiles.map(p=>secrets.open(p.secret)),runtime.engine.password].filter(Boolean))for(let n=Math.min(secret.length-1,runtime.rawDraft.length);n>hidden;n--)if(runtime.rawDraft.endsWith(secret.slice(0,n))){hidden=n;break;}
+   for(const secret of [...state.profiles.map(p=>secrets.open(p.secret)),runtime.engine?.password,runtime.engine?.key,...accounts.sensitiveValues()].filter(Boolean))for(let n=Math.min(secret.length-1,runtime.rawDraft.length);n>hidden;n--)if(runtime.rawDraft.endsWith(secret.slice(0,n))){hidden=n;break;}
    task.draft=safe(hidden?runtime.rawDraft.slice(0,-hidden)+'[redacted]':runtime.rawDraft);changed();
   };
   if(event.type==='permission.asked'||event.type==='permission.updated'){if(!task.pending.some(p=>p.id===properties.id))task.pending.push({...properties,kind:'permission'});task.status='permission';addEvent(task,{type:'permission',text:'等待批准：'+(properties.permission||properties.type||'工具操作')});}
@@ -39,21 +43,28 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
   else if(event.type==='session.error'){task.error=JSON.stringify(properties.error||{}).slice(0,3000);changed();}
  }
  async function run(task,text,profile){
-  const engine=engineFactory({binary,dataDir,task,profile,key:secrets.open(profile.secret),onEvent:event=>onEvent(task,event)});
-  const runtime={engine,cancelled:false};let finalStatus='idle';active.set(task.id,runtime);
-  const deadline=setTimeout(()=>{runtime.cancelled=true;task.error='本轮超过 15 分钟，已请求停止。核对执行记录后再继续。';void engine.stop();},15*60*1000);
+  const runtime={engine:null,cancelled:false};let finalStatus='idle',grant;active.set(task.id,runtime);
+  const deadline=setTimeout(()=>{runtime.cancelled=true;task.error='本轮超过 15 分钟，已请求停止。核对执行记录后再继续。';void runtime.engine?.stop();},15*60*1000);
   try{
+   if(profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
+   const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
+   const engine=runtime.engine=engineFactory({binary,dataDir,task,profile:resolved,key:grant?.key||secrets.open(profile.secret),onEvent:event=>onEvent(task,event)});
    await engine.start();if(runtime.cancelled)return;
    task.status='running';storage.save();changed();
    const answer=await engine.send(text);if(runtime.cancelled)return;
    const history=safe(await engine.history());
    task.messages=history.filter(m=>['user','assistant'].includes(m.info?.role)).map(m=>({id:m.info.id,role:m.info.role,text:m.parts.filter(p=>p.type==='text').map(p=>p.text||'').join('\n'),at:new Date((m.info.time?.created)||Date.now()).toISOString()})).filter(m=>m.text).slice(-200);
    if(answer?.info?.error)throw Error(JSON.stringify(answer.info.error));
-   task.error=null;
-   addEvent(task,{type:'done',text:'本轮执行已结束，请检查实际变更与验证结果。'});
+   task.error=null;addEvent(task,{type:'done',text:'本轮执行已结束，请检查实际变更与验证结果。'});
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);addEvent(task,{type:'error',text:task.error});}}
-  finally{clearTimeout(deadline);await engine.stop();task.status=runtime.cancelled?'stopped':finalStatus;task.pending=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
+  finally{clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();task.status=runtime.cancelled?'stopped':finalStatus;task.pending=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
  }
+ function accountProfile(input,existing){
+  const account=accounts.find(requireText(input.accountId,'账号'));if(!account.secret)throw new InputError('账号已退出，请先登录或导入');
+  const p={id:existing?.id||randomUUID(),label:requireText(input.label,'连接名称',120),mode:'account',accountId:account.id,model:requireText(input.model,'模型 ID',160),protocol:'responses',secret:null};
+  if(existing?.verification&&existing.accountId===p.accountId&&existing.model===p.model)p.verification=existing.verification;return p;
+ }
+
  const auth=randomBytes(32).toString('hex');let origin;
  const server=http.createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
@@ -72,26 +83,50 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
    if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'需要 JSON'});
    const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>100000)return send(413,{error:'内容过大'});chunks.push(chunk);}
    let input;try{input=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new InputError('JSON 格式无效');}if(!input||typeof input!=='object'||Array.isArray(input))throw new InputError('需要对象');
+   if(path==='/api/accounts/import'){
+    if(!bearer)return send(403,{error:'请使用桌面端文件选择器导入'});
+    if(active.size)throw new InputError('请先停止执行，再导入账号');
+    const accountId=accounts.importCodex(requireText(input.document,'凭证文件',90000),input.label);return send(200,{accountId});
+   }
+   if(path==='/api/accounts/login/start'){
+    if(!bearer)return send(403,{error:'请通过桌面按钮打开登录'});
+    if(input.accountId&&active.size)throw new InputError('请先停止任务，再重新登录已有账号');
+    return send(200,await accounts.beginLogin(input.accountId));
+   }
+   if(path==='/api/accounts/login/status')return send(200,accounts.loginStatus(input.id));
+   if(path==='/api/accounts/login/cancel'){accounts.cancelLogin(input.id);return send(200,{ok:true});}
+   if(path==='/api/accounts/models')return send(200,await accounts.models(input.id));
+   if(path==='/api/accounts/quota')return send(200,await accounts.quota(input.id));
+   if(path==='/api/accounts/logout'){
+    if(active.size)throw new InputError('请先停止任务，再退出账号');
+    accountProxy.revokeAccount(input.id);return send(200,await accounts.signOut(input.id));
+   }
    if(path==='/api/profiles'){
     if(active.size)throw new InputError('请先停止执行，再修改连接设置');
     const existing=input.id?state.profiles.find(p=>p.id===input.id):undefined;if(input.id&&!existing)throw new InputError('连接不存在');
-    const profile=profileInput(input,existing,secrets.seal);if(existing){delete existing.verification;Object.assign(existing,profile);}else state.profiles.push(profile);storage.save();changed();return send(200,view());
+    const profile=(input.mode||existing?.mode)==='account'?accountProfile(input,existing):profileInput(input,existing,secrets.seal);if(existing){delete existing.verification;Object.assign(existing,profile);}else state.profiles.push(profile);storage.save();changed();return send(200,view());
    }
    if(path==='/api/connections/models'){
     const existing=input.id?state.profiles.find(p=>p.id===input.id):undefined;if(input.id&&!existing)throw new InputError('连接不存在');
     const profile=profileInput({...input,model:input.model||'model-list-only'},existing,secrets.seal);
-    return send(200,await listModels(profile,secrets.open(profile.secret),connectionFetch));
+    return send(200,profile.mode==='account'?await accounts.models(profile.accountId):await listModels(profile,secrets.open(profile.secret),connectionFetch));
    }
    if(path==='/api/profiles/test'||path==='/api/profiles/verify'){
     const profile=state.profiles.find(p=>p.id===input.id);if(!profile)throw new InputError('请先保存连接');
-    if(path.endsWith('/test'))return send(200,await listModels(profile,secrets.open(profile.secret),connectionFetch));
+    if(path.endsWith('/test'))return send(200,profile.mode==='account'?await accounts.models(profile.accountId):await listModels(profile,secrets.open(profile.secret),connectionFetch));
     if(input.consent!==true)throw new InputError('请先确认：此检查会发送固定诊断消息并可能消耗模型用量，不会读取项目文件');
     const snapshot=JSON.stringify(profile),target=structuredClone(profile),targetKey=secrets.open(target.secret);
     let result;
-    try{result=await verifyConnection(target,targetKey,connectionFetch);}catch(error){
+    let diagnosticGrant;
+    try{
+     if(target.mode==='account'){diagnosticGrant=accountProxy.grant(target.accountId,target.model);result=await verifyResponses({...target,baseURL:diagnosticGrant.baseURL},diagnosticGrant.key);}
+     else if(target.protocol==='responses')result=await verifyResponses(target,targetKey,connectionFetch);
+     else if(target.protocol==='anthropic')throw new InputError('Anthropic 连接请通过一次实际任务验证；此处暂不做付费诊断');
+     else result=await verifyConnection(target,targetKey,connectionFetch);
+    }catch(error){
      if(JSON.stringify(state.profiles.find(p=>p.id===input.id))===snapshot){profile.verification={at:new Date().toISOString(),inference:false,toolCalling:false};storage.save();changed();}
      throw error;
-    }
+    }finally{diagnosticGrant?.revoke();}
     if(JSON.stringify(state.profiles.find(p=>p.id===input.id))!==snapshot)throw new InputError('检查期间连接已改变，请重新检查');
     profile.verification={at:new Date().toISOString(),inference:result.inference,toolCalling:result.toolCalling};storage.save();changed();
     return send(200,result);
@@ -108,7 +143,7 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
     const text=requireText(input.text,'任务内容');const profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(!profile)throw new InputError('请选择可用的连接');
     task.profileId=profile.id;task.status='starting';task.error=null;task.pending=[];task.draft='';task.messages.push({id:randomBytes(12).toString('hex'),role:'user',text:safe(text),at:new Date().toISOString()});storage.save();const execution=run(task,text,structuredClone(profile));pendingRuns.add(execution);void execution.finally(()=>pendingRuns.delete(execution));changed();return send(202,{started:true});
    }
-   if(match[2]==='stop'){if(runtime){runtime.cancelled=true;void runtime.engine.stop();}return send(200,{stopping:!!runtime});}
+   if(match[2]==='stop'){if(runtime){runtime.cancelled=true;void runtime.engine?.stop();}return send(200,{stopping:!!runtime});}
    if(!runtime)throw new InputError('执行已结束');const pending=task.pending.find(p=>p.id===input.id);if(!pending)throw new InputError('请求已失效');
    if(match[2]==='permission'){if(pending.kind!=='permission'||!['once','reject'].includes(input.reply))throw new InputError('请选择批准一次或拒绝');await runtime.engine.permission(input.id,input.reply);}
    else{if(pending.kind!=='question'||!Array.isArray(input.answers)||!input.answers.every(a=>Array.isArray(a)&&a.every(s=>typeof s==='string')))throw new InputError('请回答问题');await runtime.engine.question(input.id,input.answers);}
@@ -116,5 +151,5 @@ export async function startDesktopServer({dataDir,binary,key,connectionFetch=fet
   }catch(error){send(error instanceof InputError?400:500,{error:error instanceof InputError?error.message:'操作失败：请检查连接和执行器状态'});}
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});origin='http://127.0.0.1:'+server.address().port;
- return {url:origin,auth,state,close:async()=>{closed=true;clearTimeout(timer);await Promise.all(Array.from(active.values(),async runtime=>{runtime.cancelled=true;await runtime.engine.stop();}));await Promise.allSettled(pendingRuns);storage.save();for(const client of clients)client.end();await new Promise(resolve=>server.close(resolve));}};
+ return {url:origin,auth,state,close:async()=>{closed=true;clearTimeout(timer);await Promise.all(Array.from(active.values(),async runtime=>{runtime.cancelled=true;await runtime.engine?.stop();}));await Promise.allSettled(pendingRuns);accounts.close();await accountProxy.close();storage.save();for(const client of clients)client.end();await new Promise(resolve=>server.close(resolve));}};
 }

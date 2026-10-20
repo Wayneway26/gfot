@@ -63,3 +63,6 @@ test('editing during a diagnostic never sends the old key to the new endpoint',a
   assert.equal(service.state.profiles[0].baseURL,'https://new-service.example/v1');assert.equal(service.state.profiles[0].verification,undefined);
  }finally{release?.();await service?.close();rmSync(dir,{recursive:true,force:true});}
 });
+test('Anthropic discovery uses native key and version headers',async()=>{
+ const result=await listModels({...profile,protocol:'anthropic'},'anthropic-secret',async(_url,options)=>{assert.equal(options.headers['x-api-key'],'anthropic-secret');assert.equal(options.headers['anthropic-version'],'2023-06-01');assert.equal(options.headers.Authorization,undefined);return json({data:[{id:'fixture'}]});});assert.equal(result.modelListed,true);
+});
