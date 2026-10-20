@@ -7,7 +7,7 @@ One client. Your local projects, accounts and model connections.
 
 一个客户端，管理本地项目、任务对话与 AI 编程连接。
 
-[English](https://github.com/Wayneway26/gfot) · [简体中文](README.zh-CN.md)
+**English** · [简体中文](README.zh-CN.md)
 
 ![Preview](https://img.shields.io/badge/preview-v0.4.0-2862F5?style=flat-square)
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
