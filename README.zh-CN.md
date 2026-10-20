@@ -7,7 +7,7 @@
 
 One desktop workspace for your AI coding connections.
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+[English](https://github.com/Wayneway26/gfot#english) · [简体中文](https://github.com/Wayneway26/gfot#简体中文)
 
 ![Preview](https://img.shields.io/badge/preview-v0.4.0-2862F5?style=flat-square)
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
