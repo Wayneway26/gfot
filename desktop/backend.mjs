@@ -1,8 +1,11 @@
 import http from 'node:http';
 import {randomBytes,randomUUID,timingSafeEqual} from 'node:crypto';
-import {readFileSync,realpathSync,statSync} from 'node:fs';
+import {readFileSync,realpathSync,statSync,mkdtempSync,rmSync} from 'node:fs';
 import {join,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {tmpdir} from 'node:os';
+import {createAgentRegistry,continuationText} from './local-agents.mjs';
+import {AcpEngine} from './acp-engine.mjs';
 import {createStore,publicState,newTask,profileInput,vault,requireText,InputError} from './state.mjs';
 import {OpenCodeEngine} from './engine.mjs';
 import {Harness2Engine,harnessStatus,harnessPrompt,validHarness} from './harness2.mjs';
@@ -12,9 +15,11 @@ import {startAccountProxy,verifyResponses} from './account-proxy.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
 const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/brand-mark.svg':'brand-mark.svg'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
-export async function startDesktopServer({dataDir,binary,key,harnessRunner,connectionFetch=fetch,accountFetch=fetch,engineFactory=options=>new OpenCodeEngine(options)}){
+export async function startDesktopServer({dataDir,binary,key,harnessRunner,connectionFetch=fetch,accountFetch=fetch,agentRegistry,agentAppRoots,acpFactory=options=>new AcpEngine(options),engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;
  const state=storage.state;
+ const agents=agentRegistry||createAgentRegistry({bundledBinary:binary,...(agentAppRoots?{appRoots:agentAppRoots}:{})});
+ const checking=new Map(),nativeLogins=new Map();
  const accounts=createAccountManager({state,vault:secrets,save:storage.save,changed:()=>changed(),credentialsChanged:id=>{accountProxy.revokeAccount(id);for(const p of state.profiles)if(p.accountId===id)delete p.verification;},fetchImpl:accountFetch});
  const accountProxy=await startAccountProxy({accounts,fetchImpl:accountFetch});
  const safe=value=>{
@@ -22,7 +27,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
   const redact=v=>typeof v==='string'?values.reduce((text,secret)=>text.split(secret).join('[redacted]'),v):Array.isArray(v)?v.map(redact):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,item])=>[k,redact(item)])):v;
   return redact(value);
  };
- const view=()=>({...publicState(state),engine:{name:'OpenCode',bundled:!!binary,version:'1.19.3'},harness2:{integrated:true,...harnessStatus(harnessRunner)},capabilities:{automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
+ const view=()=>({...publicState(state),agents:agents.list().map(a=>({...a,check:state.agentChecks?.[a.id],login:[...nativeLogins.values()].find(l=>l.agentId===a.id)?.public})),engine:{name:'OpenCode',bundled:!!binary,version:'1.19.3'},harness2:{integrated:true,...harnessStatus(harnessRunner)},capabilities:{agentSwitching:true,automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
  function changed(){if(closed)return;for(const client of clients)client.write('event: state\ndata: '+JSON.stringify(view())+'\n\n');clearTimeout(timer);timer=setTimeout(storage.save,80);}
  function addEvent(task,event){task.events.push({...event,at:new Date().toISOString()});task.events=task.events.slice(-150);changed();}
  function onEvent(task,event){
@@ -43,18 +48,33 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
   }else if(event.type==='message.part.delta'&&properties.field==='text'){draft((active.get(task.id)?.rawDraft||'')+String(raw.delta||''));}
   else if(event.type==='session.error'){task.error=JSON.stringify(properties.error||{}).slice(0,3000);changed();}
  }
- async function run(task,text,profile){
+ async function run(task,text,profile,agent){
   const runtime={engine:null,cancelled:false};let finalStatus='idle',grant;active.set(task.id,runtime);
   const deadline=setTimeout(()=>{runtime.cancelled=true;task.error='本轮超过 15 分钟，已请求停止。核对执行记录后再继续。';void runtime.engine?.stop();},15*60*1000);
   try{
-   if(profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
+   const slots=task.agentSessions||={};
+   const saved=slots[agent.id]||(agent.kind==='builtin'&&task.sessionId&&!Object.keys(slots).length?{sessionId:task.sessionId,cursor:task.messages.length-1}:{});
+   const engineTask=task;engineTask.sessionId=saved.sessionId||null;
+   const wasFresh=!engineTask.sessionId;
+   if(agent.kind==='builtin'&&profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
-   const engine=runtime.engine=engineFactory({binary,dataDir,task,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event)});
+   const engine=runtime.engine=agent.kind==='builtin'?engineFactory({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event)}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event)});
    await engine.start();if(runtime.cancelled)return;
+   task.sessionId=engineTask.sessionId;
+   const transfer=continuationText(task,text,{fresh:wasFresh||engine.resumed===false,cursor:saved.cursor||0});
+   let outgoing=transfer.text;
+   if(agent.kind==='acp'&&task.adoptedHarness)outgoing='Task instructions explicitly adopted by the user:\n'+harnessPrompt(task.adoptedHarness.tree)+'\n\n'+outgoing;
+   if(transfer.forwarded||transfer.omitted)addEvent(task,{type:'handoff',text:'共享上下文：'+transfer.forwarded+' 条对话'+(transfer.omitted?'；较早的 '+transfer.omitted+' 条未传递，请补充任务备注。':'' )});
    task.status='running';storage.save();changed();
-   const answer=await engine.send(text);if(runtime.cancelled)return;
+   const answer=await engine.send(outgoing);if(runtime.cancelled)return;
    const history=safe(await engine.history());
-   task.messages=history.filter(m=>['user','assistant'].includes(m.info?.role)).map(m=>({id:m.info.id,role:m.info.role,text:m.parts.filter(p=>p.type==='text').map(p=>p.text||'').join('\n'),at:new Date((m.info.time?.created)||Date.now()).toISOString()})).filter(m=>m.text).slice(-200);
+   const lastUser=history.findLastIndex(m=>m.info?.role==='user');
+   for(const m of history.slice(lastUser+1).filter(m=>m.info?.role==='assistant')){
+    const answerText=(m.parts||[]).filter(p=>p.type==='text').map(p=>p.text||'').join('\n');
+    if(answerText)task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:answerText,at:new Date(m.info.time?.created||Date.now()).toISOString()});
+   }
+   slots[agent.id]={sessionId:engineTask.sessionId,cursor:task.messages.length};
+   if(agent.kind==='acp'){state.agentChecks||={};state.agentChecks[agent.id]={at:new Date().toISOString(),connected:true,inference:true};}
    if(answer?.info?.error)throw Error(JSON.stringify(answer.info.error));
    task.error=null;addEvent(task,{type:'done',text:'本轮执行已结束，请检查实际变更与验证结果。'});
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);addEvent(task,{type:'error',text:task.error});}}
@@ -100,6 +120,31 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    if(!req.headers['content-type']?.startsWith('application/json'))return send(415,{error:'需要 JSON'});
    const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>100000)return send(413,{error:'内容过大'});chunks.push(chunk);}
    let input;try{input=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new InputError('JSON 格式无效');}if(!input||typeof input!=='object'||Array.isArray(input))throw new InputError('需要对象');
+   if(path==='/api/agents/refresh'){agents.refresh();changed();return send(200,view());}
+   if(path==='/api/agents/login/start'){
+    if(!bearer)return send(403,{error:'请通过桌面客户端启动登录'});
+    const agent=agents.get(input.id);if(!['workbuddy','workbuddy-ai'].includes(agent.id))throw new InputError('请在此 Agent 的原应用中登录');
+    if(active.size||checking.size||[...nativeLogins.values()].some(l=>l.public.status==='pending'))throw new InputError('请先结束执行或当前登录');
+    const id=randomUUID(),folder=mkdtempSync(join(tmpdir(),'gfot-agent-login-'));
+    const engine=acpFactory({launch:agents.command(agent.id),task:{folder,sessionId:null}}),login={agentId:agent.id,engine,public:{id,status:'pending',note:'请在浏览器中完成 CLI 登录；gfot 不读取登录 Token。'}};
+    for(const [oldId,old] of nativeLogins)if(old.agentId===agent.id)nativeLogins.delete(oldId);nativeLogins.set(id,login);changed();
+    const pending=(async()=>{try{await engine.start();const methodId=agent.id==='workbuddy'?'internal':'external';if(!engine.info.authMethods?.some(m=>m.id===methodId))throw Error('此版本没有相应的 CLI 登录方式');await engine.request('authenticate',{methodId},5*60*1000);login.public.status='complete';login.public.note='CLI 登录完成，可返回任务发送消息验证执行。';}
+     catch(error){if(login.public.status==='pending'){login.public.status='error';login.public.note=safe(String(error.message)).slice(0,1000);}}
+     finally{await engine.stop();rmSync(folder,{recursive:true,force:true});changed();}})();
+    pendingRuns.add(pending);void pending.finally(()=>pendingRuns.delete(pending));return send(200,login.public);
+   }
+   if(path==='/api/agents/login/cancel'){
+    const login=nativeLogins.get(input.id);if(!login)throw new InputError('登录不存在');login.public.status='cancelled';login.public.note='登录已取消';await login.engine.stop();changed();return send(200,{ok:true});
+   }
+   if(path==='/api/agents/check'){
+    const agent=agents.get(input.id);if(agent.kind!=='acp')throw new InputError('此 Agent 无需 ACP 检查');
+    if(checking.has(agent.id)||active.size)throw new InputError('请等待执行或检查结束');
+    checking.set(agent.id,null);const folder=mkdtempSync(join(tmpdir(),'gfot-agent-check-'));let engine;
+    try{engine=acpFactory({launch:agents.command(agent.id),task:{folder,sessionId:null},readOnly:true});checking.set(agent.id,engine);await engine.start();
+     state.agentChecks||={};state.agentChecks[agent.id]={at:new Date().toISOString(),connected:true,inference:false};storage.save();changed();return send(200,{ok:true,note:'协议与会话创建通过，尚未调用模型。首次任务仍需验证账号与额度。'});
+    }catch(error){state.agentChecks||={};state.agentChecks[agent.id]={at:new Date().toISOString(),connected:false,inference:false};storage.save();changed();throw new InputError(safe(error.message));}
+    finally{await engine?.stop();checking.delete(agent.id);rmSync(folder,{recursive:true,force:true});}
+   }
    if(path==='/api/accounts/import'){
     if(!bearer)return send(403,{error:'请使用桌面端文件选择器导入'});
     if(active.size)throw new InputError('请先停止执行，再导入账号');
@@ -150,11 +195,19 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    }
    if(path==='/api/tasks'){
     let folder;try{folder=realpathSync(requireText(input.folder,'项目目录',4096));if(!statSync(folder).isDirectory())throw Error();}catch{throw new InputError('项目目录不存在或不可访问');}
-    if(!state.profiles.some(p=>p.id===input.profileId))throw new InputError('请先配置并选择模型连接');
-    const task=newTask(input,folder);state.tasks.unshift(task);storage.save();changed();return send(200,{taskId:task.id});
+    const agent=agents.get(input.agentId||'opencode');if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');
+    if(agent.requiresProfile!==false&&agent.kind==='builtin'&&!state.profiles.some(p=>p.id===input.profileId))throw new InputError('请先配置并选择模型连接');
+    const task=newTask(input,folder);task.agentId=agent.id;task.agentSessions={};task.contextNotes='';state.tasks.unshift(task);storage.save();changed();return send(200,{taskId:task.id});
    }
-   const match=path.match(/^\/api\/tasks\/([^/]+)\/(prompt|stop|permission|question|harness|harness-adopt|harness-clear)$/);if(!match)return send(404,{error:'未找到该操作'});
+   const match=path.match(/^\/api\/tasks\/([^/]+)\/(prompt|stop|permission|question|harness|harness-adopt|harness-clear|agent|notes)$/);if(!match)return send(404,{error:'未找到该操作'});
    const task=state.tasks.find(t=>t.id===match[1]);if(!task)throw new InputError('任务不存在');const runtime=active.get(task.id);
+   if(match[2]==='agent'){
+    if(runtime)throw new InputError('请先结束或停止当前回合');const agent=agents.get(input.agentId);if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');
+    task.agentId=agent.id;task.sessionId=task.agentSessions?.[agent.id]?.sessionId||null;task.error=null;storage.save();addEvent(task,{type:'agent',text:'已选择 '+agent.name+'，下次发送时执行'});return send(200,view());
+   }
+   if(match[2]==='notes'){
+    if(runtime)throw new InputError('请先结束或停止当前回合');if(typeof input.text!=='string'||input.text.length>8000)throw new InputError('任务备注最多 8000 字符');task.contextNotes=safe(input.text);storage.save();changed();return send(200,view());
+   }
    if(match[2]==='harness-adopt'){
     if(runtime)throw new InputError('请先停止执行');if(input.consent!==true)throw new InputError('请确认采用此配置');
     if(task.harnessRun?.status!=='ready'||!task.harnessRun.result?.successful)throw new InputError('没有成功的配置可以采用');
@@ -163,15 +216,16 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    }
    if(match[2]==='harness-clear'){if(runtime)throw new InputError('请先停止执行');delete task.adoptedHarness;storage.save();changed();return send(200,view());}
    if(match[2]==='harness'){
+    if((task.agentId||'opencode')!=='opencode')throw new InputError('Harness² 副本探测请先选择内置 OpenCode 和模型连接；采用后的指令可用于其他 Agent');
     if(runtime||active.size>=2)throw new InputError('请等待当前执行结束');if(input.consent!==true)throw new InputError('请确认副本探测和最多 10 次模型会话');
     const status=harnessStatus(harnessRunner);if(!status.available)throw new InputError(status.reason);
     const text=requireText(input.text,'优化任务'),profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(!profile)throw new InputError('请选择连接');
     task.status='starting';task.error=null;task.pending=[];storage.save();const execution=runHarness(task,text,structuredClone(profile));pendingRuns.add(execution);void execution.finally(()=>pendingRuns.delete(execution));changed();return send(202,{started:true});
    }
    if(match[2]==='prompt'){
-    if(runtime)throw new InputError('本轮尚未结束');if(active.size>=2)throw new InputError('首版最多同时执行两个任务');
-    const text=requireText(input.text,'任务内容');const profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(!profile)throw new InputError('请选择可用的连接');
-    task.profileId=profile.id;task.status='starting';task.error=null;task.pending=[];task.draft='';task.messages.push({id:randomBytes(12).toString('hex'),role:'user',text:safe(text),at:new Date().toISOString()});storage.save();const execution=run(task,text,structuredClone(profile));pendingRuns.add(execution);void execution.finally(()=>pendingRuns.delete(execution));changed();return send(202,{started:true});
+    if(runtime)throw new InputError('本轮尚未结束');if([...nativeLogins.values()].some(l=>l.public.status==='pending'))throw new InputError('请先完成或取消 Agent 登录');if(active.size>=2)throw new InputError('首版最多同时执行两个任务');
+    const text=requireText(input.text,'任务内容');const agent=agents.get(task.agentId||'opencode');if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');const profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(agent.kind==='builtin'&&!profile)throw new InputError('请选择可用的连接');
+    if(profile)task.profileId=profile.id;task.status='starting';task.error=null;task.pending=[];task.draft='';task.messages.push({id:randomBytes(12).toString('hex'),role:'user',agentId:agent.id,text:safe(text),at:new Date().toISOString()});storage.save();const execution=run(task,text,profile?structuredClone(profile):null,agent);pendingRuns.add(execution);void execution.finally(()=>pendingRuns.delete(execution));changed();return send(202,{started:true});
    }
    if(match[2]==='stop'){if(runtime){runtime.cancelled=true;void runtime.engine?.stop();}return send(200,{stopping:!!runtime});}
    if(!runtime)throw new InputError('执行已结束');const pending=task.pending.find(p=>p.id===input.id);if(!pending)throw new InputError('请求已失效');
@@ -181,5 +235,5 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
   }catch(error){send(error instanceof InputError?400:500,{error:error instanceof InputError?error.message:'操作失败：请检查连接和执行器状态'});}
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});origin='http://127.0.0.1:'+server.address().port;
- return {url:origin,auth,state,close:async()=>{closed=true;clearTimeout(timer);await Promise.all(Array.from(active.values(),async runtime=>{runtime.cancelled=true;await runtime.engine?.stop();}));await Promise.allSettled(pendingRuns);accounts.close();await accountProxy.close();storage.save();for(const client of clients)client.end();await new Promise(resolve=>server.close(resolve));}};
+ return {url:origin,auth,state,close:async()=>{closed=true;clearTimeout(timer);await Promise.all([...checking.values()].filter(Boolean).map(e=>e.stop()));await Promise.all([...nativeLogins.values()].map(async l=>{l.public.status='cancelled';await l.engine.stop();}));await Promise.all(Array.from(active.values(),async runtime=>{runtime.cancelled=true;await runtime.engine?.stop();}));await Promise.allSettled(pendingRuns);accounts.close();await accountProxy.close();storage.save();for(const client of clients)client.end();await new Promise(resolve=>server.close(resolve));}};
 }

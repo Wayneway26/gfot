@@ -1,4 +1,4 @@
-const {app,BrowserWindow,ipcMain,dialog,utilityProcess,safeStorage,Menu,shell}=require('electron');
+const {app,BrowserWindow,ipcMain,dialog,utilityProcess,safeStorage,Menu,shell,clipboard}=require('electron');
 const {join}=require('node:path');
 const {readFileSync,writeFileSync,mkdirSync,existsSync,statSync}=require('node:fs');
 const {randomBytes}=require('node:crypto');
@@ -13,6 +13,8 @@ function masterKey(dir){
  const key=randomBytes(32).toString('base64');writeFileSync(path,safeStorage.encryptString(key),{mode:0o600});return key;
 }
 function trusted(event){if(!base||event.sender!==window?.webContents||!event.senderFrame?.url.startsWith(base+'/'))throw Error('Untrusted frame');}
+ipcMain.handle('gfot:copy-text',async(event,text)=>{trusted(event);if(typeof text!=='string'||text.length>80000)throw Error('复制内容无效');clipboard.writeText(text);return {ok:true};});
+ipcMain.handle('gfot:open-agent',async(event,id)=>{trusted(event);const {createAgentRegistry}=await import('./local-agents.mjs');const agent=createAgentRegistry().get(id);if(!agent.appPath)throw Error('没有可打开的应用');const error=await shell.openPath(agent.appPath);if(error)throw Error('无法打开 Agent 应用');return {ok:true};});
 ipcMain.handle('gfot:folder',async event=>{trusted(event);const result=await dialog.showOpenDialog(window,{title:'选择项目目录',properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0];});
 async function serviceCall(path,input){
  const response=await fetch(base+'/api/'+path,{method:'POST',headers:{authorization:'Bearer '+worker.auth,'content-type':'application/json'},body:JSON.stringify(input)});
@@ -23,6 +25,7 @@ ipcMain.handle('gfot:import-codex',async event=>{
  if(result.canceled)return null;const path=result.filePaths[0];if(statSync(path).size>90000)throw Error('凭证文件过大，拒绝导入');
  return serviceCall('accounts/import',{document:readFileSync(path,'utf8')});
 });
+ipcMain.handle('gfot:agent-login',async(event,id)=>{trusted(event);return serviceCall('agents/login/start',{id});});
 ipcMain.handle('gfot:chatgpt-login',async(event,accountId)=>{
  trusted(event);const result=await serviceCall('accounts/login/start',{...(typeof accountId==='string'?{accountId}:{})});
  const url=new URL(result.authorizationURL);if(url.origin!=='https://auth.openai.com'||url.pathname!=='/api/accounts/authorize')throw Error('不可信的授权地址');

@@ -1,5 +1,5 @@
 // Run separately with Electron on macOS. All model output is synthetic/local.
-const {app,dialog}=require('electron');
+const {app,dialog,utilityProcess}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict');
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gfot-ui-smoke-'));
 const resources=process.env.GFOT_QA_RESOURCES;
@@ -7,6 +7,11 @@ if(resources){Object.defineProperty(app,'isPackaged',{value:true});Object.define
 app.setPath('userData',path.join(dir,'appdata'));
 const report=process.env.GFOT_QA_REPORT||path.join(os.tmpdir(),'gfot-ui-smoke.json');
 const models=[],requestBodies=[];let diagnostics=0;
+const appsDir=path.join(dir,'apps'),localCli=path.join(appsDir,'OpenCode.app/Contents/Resources/opencode-cli');
+fs.mkdirSync(path.dirname(localCli),{recursive:true});
+fs.writeFileSync(localCli,'#!/usr/bin/env node\n'+fs.readFileSync(path.join(__dirname,'helpers/acp-fixture.mjs'),'utf8'),{mode:0o700});
+const originalFork=utilityProcess.fork.bind(utilityProcess);
+utilityProcess.fork=(...args)=>{const worker=originalFork(...args),post=worker.postMessage.bind(worker);worker.postMessage=message=>post(message.type==='start'?{...message,agentAppRoots:[appsDir]}:message);return worker;};
 const projectDir=path.join(dir,'project');fs.mkdirSync(projectDir);fs.writeFileSync(path.join(projectDir,'fixture.txt'),'Synthetic project source');
 const fixtureAuth=path.join(dir,'synthetic-codex-auth.json');
 const fixtureAccess='eyJhbGciOiJSUzI1NiJ9.'+Buffer.from(JSON.stringify({iss:'https://auth.openai.com',sub:'native-import-test',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.fixture-signature';
@@ -69,9 +74,21 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  assert.ok(compact.body<=compact.viewport && compact.send<=compact.viewport,'compact layout must keep the send button visible');
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-compact.png'),(await win.webContents.capturePage()).toPNG());
  win.setSize(1240,820);await delay(200);
+ await js("document.querySelector('#task-notes').click();document.querySelector('#modal-form').elements.text.value='Preserve fixture API';document.querySelector('#modal-form').requestSubmit()");
+ await until("!document.querySelector('#dialog').open");
+ await js("document.querySelector('#agent-select').value='opencode-local';document.querySelector('#agent-select').dispatchEvent(new Event('change'))");
+ await until("document.querySelector('#profile-select').hidden && document.querySelector('#agent-select').value==='opencode-local'");
+ await js("document.querySelector('#prompt').value='Native continuation fixture';document.querySelector('#composer').requestSubmit()");
+ await until("document.querySelector('[data-reply=once]')");
+ await js("document.querySelector('[data-reply=once]').click()");
+ await until("document.querySelector('#status').textContent==='等待任务' && document.querySelector('#messages').innerText.includes('你好 approved')");
+ assert.equal((await api('state')).tasks[0].messages.length,6);
+ await js("document.querySelector('#agent-select').value='opencode';document.querySelector('#agent-select').dispatchEvent(new Event('change'))");
+ await until("!document.querySelector('#profile-select').hidden");
  const beforeH2=await api('state');assert.equal(beforeH2.harness2.available,true,'UI H2 test requires Python 3.12/3.13');
  await js("document.querySelector('#h2-optimize').click();document.querySelector('#modal-form').elements.text.value='Explain the fixture; do not modify files.';document.querySelector('#modal-form input[type=checkbox]').checked=true;document.querySelector('#modal-form').requestSubmit()");
  await until("document.querySelector('#h2-adopt') && document.querySelector('#status').textContent==='等待任务'");
+ assert.ok(await js("document.querySelector('.prompt-preview').textContent.includes('H2_FIXTURE_ADOPTED')"),'optimized prompt is inspectable before adoption');
  const h2=(await api('state')).tasks[0].harnessRun;assert.equal(h2.result.method.ledger.R,4);assert.equal(h2.result.method.ledger.P,3);
  assert.equal(fs.readFileSync(path.join(projectDir,'fixture.txt'),'utf8'),'Synthetic project source');
  await js("document.querySelector('#h2-adopt').click()");await until("document.querySelector('#h2-clear')");
@@ -80,7 +97,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  assert.ok(requestBodies.at(-1).includes('H2_FIXTURE_ADOPTED'),'adopted prompt must reach the real executor');
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-harness2.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-task.png'),(await win.webContents.capturePage()).toPNG());
- fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','brand SVG assets loaded','840px composer stays within viewport','screenshot']},null,2));
+ fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','inspectable Harness2 optimized prompt','brand SVG assets loaded','840px composer stays within viewport','screenshot']},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({ok:false,error:String(error),stack:error.stack}));gateway.close();app.exit(1);}finally{gateway.close();app.quit();}});});
 require(resources?path.join(resources,'app.asar','desktop','main.cjs'):path.join(__dirname,'..','main.cjs'));
 setTimeout(()=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:'120s timeout'}));app.exit(1);},120000).unref();

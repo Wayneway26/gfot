@@ -1,4 +1,4 @@
-# gfot macOS 预览版（0.5.0-h2.2）
+# gfot macOS 预览版（0.6.0-h2.1）
 
 更新时间：2026-10-21。
 
@@ -8,7 +8,7 @@
 
 当前执行路径：自己的 macOS GUI → 本地任务服务 → 内置 OpenCode Agent Loop → gfot Codex 凭证代理、用户配置的 HTTPS API 或本机模型服务 → 上游 / 本机模型。
 
-同一个本地项目、同一个任务和 OpenCode 会话，可以在回合之间选择不同模型连接。模型改变，执行器保持不变。这与切换到 WorkBuddy / Codex 的完整 Agent 执行器不同。
+同一个本地项目、同一个任务和 OpenCode 会话，可以在回合之间选择不同模型连接。模型改变，执行器保持不变。桌面版另提供本机 ACP 执行器选择，接入范围、CLI 登录要求和真实诊断见 [本地 Agent](local-agents.md)。
 
 长期目标是逐步为 WorkBuddy、Codex、千问办公、豆包工作、OpenCode、Trae 等工具提供统一任务入口；当前接入范围以 [README 支持矩阵](../README.zh-CN.md#agent-接入进度) 为准。旧工作台的 WorkBuddy MCP 桥接不等于桌面版已能调用 WorkBuddy 执行器。
 
@@ -23,7 +23,7 @@
 
 ## 尚未接入
 
-Codex 本地凭证导入和独立 ChatGPT 授权现为实验功能，详见 [账号文档](accounts.md)。仅本地导入账号提供手动兼容额度查询，其他平台凭证导入及自动切换未实现。WorkBuddy 完整执行器、Codex 完整执行器仍未接入；本 h2 分支现已提供 Harness² 任务级优化。不能把“代理可达”当成“某家订阅可用”。
+Codex 本地凭证导入和独立 ChatGPT 授权现为实验功能，详见 [账号文档](accounts.md)。仅本地导入账号提供手动兼容额度查询，其他平台凭证导入及自动切换未实现。WorkBuddy / WorkBuddy AI 已增加本机 CLI 的 ACP 执行适配，实际推理需要 CLI 登录；Codex 完整执行器未接入；本 h2 分支现已提供 Harness² 任务级优化。不能把“代理可达”当成“某家订阅可用”。
 
 ## 验收证据
 

@@ -36,3 +36,9 @@ The final packaged app passed again after review fixes. Both Standards and Spec 
 gfot 0.5.0-h2.2 applies the cobalt/cyan vector identity to the README, desktop UI and macOS icon. Syntax checks and the source Electron smoke passed. The packaged Electron smoke also passed, including real Harness²/OpenCode synthetic-model execution, model connection switching, SVG loading and an 840px-wide composer overflow check. Welcome, task, compact and settings layouts were inspected visually. The README screenshots are captures of the new client, not mockups.
 
 [Packaged UI report](brand/ui-check.json). This visual update used no real account credentials or paid model calls. The earlier 83-test full-suite result above predates this styling patch; the full suite was not rerun for this patch.
+
+## Local Agent adapters — 2026-10-21
+
+gfot 0.6.0-h2.1: syntax checks passed, 93 automated tests passed with zero failures/skips. New tests cover ACP transport/permissions/cancellation/output limits, per-executor session restoration, shared task notes and native login cancellation. The source Electron workflow passed with a synthetic installed ACP Agent, real bundled OpenCode and real Harness²; it switches executors, approves a native tool request, preserves canonical messages and adopts an inspectable optimized prompt.
+
+Real installed OpenCode 2.1.1 passed ACP initialization, session creation and a fixed no-project inference. WorkBuddy 5.8.3 and WorkBuddy AI 5.8.4 passed initialization/session creation; fixed inference reported authentication required, including after selecting their native config directories. These two real inference paths are not validated as usable until CLI login. No native credentials were extracted into gfot. 豆包/千问 remain unavailable for automatic execution. See [adapter details](local-agents.md).
