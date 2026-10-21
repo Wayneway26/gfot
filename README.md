@@ -1,62 +1,52 @@
 <div align="center">
 
-<img src="docs/readme-hero.svg" alt="gfot — One project. Keep going. 一个项目，接着做下去。" width="100%" />
+<img src="docs/readme-hero.svg" alt="gfot — One project. Keep going." width="100%" />
 
-**One workspace. Keep your task moving.**<br />
-Local projects, AI connections, and execution you can follow.
+**One project. Your choice of models.**<br />
+A desktop workspace for AI coding tasks.
 
 **English** · [简体中文](README.zh-CN.md)
 
-![Preview](https://img.shields.io/badge/preview-h2%20branch-2862F5?style=flat-square)
+![Preview](https://img.shields.io/badge/status-preview-2862F5?style=flat-square)
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
-[Get started](#get-started) · [Agent support](#agent-support-at-a-glance) · [Connections](#connect-your-models) · [How it works](#how-it-works) · [Roadmap](#roadmap)
+[Features](#features) · [Quick start](#quick-start) · [Harness²](#harness²) · [Documentation](#documentation)
 
 </div>
 
 <br />
 
-![gfot macOS desktop preview](docs/desktop-preview.png)
+![gfot desktop](docs/desktop-preview.png)
 
-## One client for your AI coding workflow
+## About gfot
 
-**gfot is a unified desktop workspace for the local AI Agent ecosystem.** Manage projects, task conversations, accounts and model connections in one client, and keep working on the same task. It currently bundles the OpenCode execution engine, supports Codex credential import, compatible APIs and local proxies, and is gradually expanding its Agent integrations.
+gfot brings local projects, task conversations and model connections into one macOS client. Open a folder, choose a connection and work with AI. Switch models or accounts between turns while continuing the same task and conversation.
 
-> **gfot 是面向本地 AI Agent 生态的统一桌面工作区。** 用一个客户端管理项目、任务对话、账号与模型连接，在同一个任务中继续工作。当前内置 OpenCode 执行引擎，支持 Codex 凭证接入、兼容 API 和本地代理，并逐步扩展其他 Agent 的适配。
+Built with Electron and Node.js, gfot integrates OpenCode's headless execution service for the Agent Loop and tools. It manages the desktop interface, task records, model connections and approval controls.
 
-The longer-term goal is a common task entry point for the local Agent ecosystem, including WorkBuddy, Codex, Qwen Office (千问办公), Doubao Work (豆包工作), OpenCode and Trae. **Support is incremental: this preview does not launch or switch all of these Agent applications.** The matrix below states what actually exists.
+## Features
 
-The execution loop is bundled **OpenCode**. You choose the models and accounts it connects to; you do not need a separate Codex or OpenCode application to run the desktop client. Importing existing Codex credentials requires an existing Codex login file.
+| | |
+| --- | --- |
+| **Projects and conversations** | Work in a local folder with saved task history and execution records. |
+| **Model choice** | Connect a local Codex login, compatible HTTPS APIs or local model services. |
+| **Task continuity** | Change model or account connections between turns in the same session. |
+| **Visible execution** | Follow streaming responses, tool requests and execution events. |
+| **Approval controls** | Review file changes, commands and access outside the project before approving them. |
+| **Local credential storage** | Encrypt account credentials and API keys with a master key protected by macOS Keychain. |
 
-| Keep your context | Choose your connections | Approve the actions |
-| --- | --- | --- |
-| Local folders, persistent conversations and a visible execution timeline. | Codex credential import, HTTPS APIs, CC Switch routes and local models. | Review file edits and commands, answer questions, or stop a run. |
+### Model connections
 
-> **Preview status:** Apple silicon, unsigned build. One real Codex-import account passed model discovery, Responses inference and a tool-result round trip. Independent ChatGPT browser login is implemented but still awaits real-account validation. [Verification details →](docs/verification.md)
+- **Codex login import** — select an existing `auth.json` to create a local encrypted credential copy.
+- **Compatible APIs** — configure Chat Completions, Responses or Anthropic endpoints.
+- **Local services and proxies** — connect Ollama or a compatible local route, including routes configured in CC Switch.
 
-## Agent support at a glance
+Connection switching uses the bundled OpenCode executor. Codex import is experimental; provider compatibility and account limits still apply. [Account and connection details](docs/accounts.md).
 
-| Agent / tool | What gfot currently connects | Evidence and boundary |
-| --- | --- | --- |
-| **OpenCode** | Bundled desktop execution engine: tools, approvals and saved conversations. | Real processes tested with synthetic models, including an approved file write and same-session account switching. |
-| **Codex** | Imports a local login credential and routes model requests through gfot's scoped proxy. | One real account passed model discovery, inference and tool-result return. Does not control the Codex desktop app or run the full Codex agent. |
-| **WorkBuddy** | The separate legacy workbench has an MCP bridge for review snapshots, results and task checkpoints. | HTTP / stdio bridge tests pass. This is not a WorkBuddy credential adapter or a desktop execution connection. |
-| **Qwen Office / 千问办公** | Integration candidate. | No adapter or validation yet; its usable interface and authorization need investigation. |
-| **Doubao Work / 豆包工作** | Integration candidate. | No adapter or validation yet; its usable interface and authorization need investigation. |
-| **Trae** | Planned Agent integration. | No credential or execution adapter, and no end-to-end validation yet. |
+## Quick start
 
-**Model connections and Agent execution are different layers.** Today the desktop client switches the model/account connection while OpenCode remains the executor. Switching complete Agent runtimes would also require separate adapters for tools, permissions, execution events and task handoff; that layer is not implemented.
-
-A compatible HTTPS API or CC Switch endpoint can be configured separately. This does not make an installed Agent automatically callable, and it is not evidence that WorkBuddy, Qwen Office, Doubao Work or Trae is supported through a proxy.
-
-> **h2 branch preview:** includes the optional Harness² task-level optimization workflow. Main remains the regular execution baseline.
-
-## Get started
-
-### Run from source
-
-Requires **macOS on Apple silicon, Node.js 22.12+ and npm**.
+Requires **an Apple silicon Mac, Node.js 22.12+ and npm**.
 
 ```sh
 git clone --branch h2 https://github.com/Wayneway26/gfot.git
@@ -66,131 +56,33 @@ node node_modules/electron/install.js
 npm run desktop
 ```
 
-### Start your first task
+1. Open **Agent 选择** and add a model connection.
+2. Create a task and choose a local project folder.
+3. Describe the work, follow execution and review requested operations.
+4. To switch connections, finish or stop the current turn, select another connection and continue.
 
-1. Open **Agent 选择** (Agent selection) and add an account, API or local service.
-2. Read the model directory and save a connection. The optional **验证可用性** check sends up to two fixed diagnostic requests after confirmation, without reading your project. Anthropic connections currently require an actual task to verify execution.
-3. Create a task, choose a local folder and describe the work. Review requested edits and commands before approving them.
-4. To change models or accounts, finish or stop the current turn, then select another connection and continue.
+Build a macOS application with `npm run dist:mac`. The `.app` and ZIP are written to `dist/`. Current builds are unsigned and have not been Apple-notarized.
 
-### Build a Mac application
+## Harness²
 
-```sh
-npm run dist:mac
-```
+The `h2` branch integrates Google's Harness² for optional task-level execution configuration refinement. It probes independent project copies, proposes instruction changes and composes a configuration from execution evidence. Review the results and explicitly adopt a configuration for later turns in that task.
 
-The `.app` and ZIP are written to `dist/`. Current builds are unsigned and have not been Apple-notarized; Intel Mac builds have not been validated.
+![Harness² task panel — synthetic-model demonstration](docs/harness2-preview.png)
 
-## Connect your models
+Harness² requires **Python 3.12 or 3.13** and makes multiple model calls. Probe changes are not automatically merged into the original project. Ordinary tasks run through OpenCode without Python. [How the integration works](docs/h2-integration.md).
 
-| Connection | Setup | Current scope |
-| --- | --- | --- |
-| **Local Codex login** | Choose **导入 Codex 登录**, then select your `auth.json`. | Encrypted access-token copy; manual quota query. Reimport when expired. One real account passed the inference and tool diagnostic. |
-| **Independent ChatGPT login** | Choose **Continue with ChatGPT** and authorize in your browser. | Separate client registration, PKCE, identity validation and serialized refresh are implemented. Real browser authorization is still pending validation. |
-| **CC Switch route** | Choose **添加 API / 代理** and enter the actual local endpoint and access key shown by CC Switch. | Select Chat Completions, Responses or Anthropic to match the route. CC Switch manages its upstream accounts. |
-| **HTTPS API / local model** | Enter your API endpoint and key, or use a DeepSeek / Ollama preset. | HTTPS for remote APIs; loopback HTTP for local services. Uses your own service and allowance. |
+## Documentation
 
-**Credential import, quota lookup and successful inference are separate checks.** A readable token or model list does not prove that a model can run. Quota lookup currently covers only locally imported Codex accounts; unknown usage is not treated as zero.
+[Desktop guide](docs/desktop-preview.md) · [Accounts and proxies](docs/accounts.md) · [Harness² integration](docs/h2-integration.md) · [Test reports](docs/verification.md)
 
-Codex import uses an unofficial compatibility endpoint that may change. Independent ChatGPT login uses a separate authorization path and the public Responses API. Tokens from these paths cannot be used interchangeably. See [account routing and validation](docs/accounts.md).
-
-Using an account in gfot does not create extra allowance or reset its five-hour / weekly limits. Automatic quota failover is not implemented; gfot does not silently replay tool operations through another account.
-
-## How it works
-
-```text
-                         gfot macOS workspace
-                   folder · conversation · approvals
-                                   │
-                      local authenticated task service
-                                   │
-                         bundled OpenCode loop
-                                   │
-                 ┌─────────────────┴─────────────────┐
-                 │                                   │
-       gfot scoped account proxy            configured model endpoint
-       ChatGPT / Codex credentials           HTTPS API · CC Switch · Ollama
-```
-
-- **gfot** owns the desktop UI, task records, connection selection and approvals.
-- **OpenCode** runs the agent loop and tools. Selecting a Codex model does not launch the complete Codex agent.
-- **The account proxy** keeps subscription credentials out of the execution process and gives it a temporary, account-and-model-bound proxy key.
-
-### Harness² is connected on this branch
-
-The `h2` branch runs the **real pinned Google Harness² core**, not a renamed execution loop. In a task, click **Harness² 优化**, describe the work and confirm the multiple-session cost. Python 3.12 or 3.13 is required for this optional workflow; ordinary execution does not require Python.
-
-```text
-User task → explicit optimization consent
-  → baseline OpenCode probe in a project copy
-  → Harness²: propose general and task-specific harness changes
-  → independent OpenCode candidate probes
-  → Harness²: compose a configuration from execution evidence
-  → composed OpenCode probe → inspect evidence → explicitly adopt configuration
-  → later ordinary turns use the adopted instructions in the original project
-```
-
-- Uses upstream `core.recursion.run_sequential(k=1)`: four probes and three configuration stages. Invalid proposals may retry, with at most ten executor sessions, sixteen steps per session, three minutes per session and fifteen minutes overall. A session can make multiple model requests; this is not a token or dollar budget. Cost telemetry is not integrated; upstream USD zero fields mean unknown cost here.
-- Only four always-on Markdown instruction files can change. The proposal channel is read-only. Generated scripts, plugins, subagents and permission changes are rejected.
-- Probes use independent bounded text copies (200 files / 2 MB), excluding hidden paths, symlinks, dependency/build/data folders and common credential filenames. This is a filtered copy, not a complete build environment or an OS sandbox. Review tool approvals; no probe code is automatically merged into your project.
-- Inspect candidate answers, trajectory excerpts and configuration notes in the task panel. A successful composed run enables **确认采用配置**; adoption persists only for later normal turns in that task and can be cleared. Completion does not prove an improvement in task quality.
-- Python sources ship separately from the Electron archive, with the upstream license and commit/file-hash manifest. No benchmark setup or external Harness² checkout is needed. Set `GFOT_PYTHON` to a Python 3.12/3.13 executable if discovery fails, then restart the app.
-
-![Harness² task-level refinement with synthetic model responses](docs/harness2-preview.png)
-
-The inner tool loop remains **OpenCode**. Cross-task automatic reflection, the experience library, parallel recursion and deeper `k>1` optimization are not implemented in this first integration. [Integration contract and upstream pin](docs/h2-integration.md).
-
-## Local data and permissions
-
-- Account credentials and API keys are encrypted at rest. The master key is protected by macOS safeStorage / Keychain.
-- Import reads only the credential file you explicitly select. It does not modify that file, copy its shared refresh token or scan other Agent credentials in the background.
-- Conversations and execution records remain local plaintext and can include code and tool inputs. Connected model providers receive the context needed for your requests; “local-first” does not mean offline inference.
-- Tool approvals are application controls, **not an operating-system sandbox**. Run untrusted projects in a separately restricted environment.
-- Back up the entire macOS Application Support directory for gfot while the app is stopped. Copying the `.app` does not back up conversations.
-
-## Verification
-
-```sh
-npm run check
-npm test
-# Native macOS UI checks, using synthetic local models:
-npm run test:ui
-```
-
-**83 automated tests passed locally**, including real OpenCode execution against synthetic model servers, approved temporary file writes, tool-result return, same-conversation account switching, credential encryption/redaction, refresh races and cancellation.
-
-The Harness² additions test the real upstream Python core, source filtering, failure/fallback accounting, cancellation, explicit adoption and vendored source hashes. Native UI tests additionally run the workflow through real OpenCode with synthetic models.
-
-A separately authorized diagnostic passed with **one real Codex-import account**. It sent fixed diagnostic prompts, used no shared refresh credential and left the original file unchanged. Real cross-account execution, browser OAuth and other upstream models remain unverified.
-
-[Test report](docs/verification.md) · [Real-account diagnostic](docs/account-diagnostic.json) · [Account implementation](docs/accounts.md)
-
-## Roadmap
-
-- [x] Native macOS workspace, local folders and persistent tasks
-- [x] Model connections, streaming tools and approval controls
-- [x] Codex credential import and scoped local Responses proxy
-- [x] Independent ChatGPT OAuth implementation; real browser validation pending
-- [x] One real Codex-account inference and tool diagnostic
-- [ ] Broader real-provider compatibility coverage
-- [ ] Native credential adapters for WorkBuddy, Claude Code, Gemini and Grok
-- [ ] Full Agent execution adapters, including WorkBuddy, Codex and Trae
-- [ ] Investigate interfaces and authorization for Qwen Office / Doubao Work
-- [ ] Quota-aware routing with safe task continuation
-- [ ] Signed and notarized macOS distribution
-- [x] Optional Harness² task-level Propose–Probe–Compose (`h2` branch)
-- [ ] Cross-task Harness² reflection/library and deeper recursion
-
-The desktop client does not import Codex / WorkBuddy chat histories or switch their complete execution engines. The earlier manual handoff workbench is still available with `npm start`; it uses separate task storage. [Earlier specification](gfot-prd.md)
+Task conversations and execution records are stored locally; connected model services receive the context needed for inference. Tool approvals are application controls, not an operating-system sandbox.
 
 ## Contributing
 
-Bug reports, compatibility results and focused pull requests are welcome. When reporting a connection problem, include the gfot version, connection type and a redacted error. **Do not attach credential files, tokens or unredacted conversation logs.**
+[Issues](https://github.com/Wayneway26/gfot/issues) and pull requests are welcome. Include the app version, connection type and a redacted error when reporting a problem. Keep credentials and private conversation logs out of reports.
 
-[Report an issue](https://github.com/Wayneway26/gfot/issues) · [Discuss an improvement](https://github.com/Wayneway26/gfot/issues/new)
+## Acknowledgments
 
-## Acknowledgments and license
+Built with [Electron](https://github.com/electron/electron), [OpenCode](https://github.com/anomalyco/opencode) and [Google Harness²](https://github.com/google-research/harness2). Connection management design draws on [CC Switch](https://github.com/farion1231/cc-switch).
 
-Built with [Electron](https://github.com/electron/electron) and [OpenCode](https://github.com/anomalyco/opencode). Account and proxy boundaries were informed by [CC Switch](https://github.com/farion1231/cc-switch); its source modules are not copied into gfot.
-
-gfot is licensed under [Apache-2.0](LICENSE). Dependencies retain their original licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
+Licensed under [Apache-2.0](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) for dependency licenses.
