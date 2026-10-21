@@ -1,9 +1,10 @@
 <div align="center">
 
-<img src="docs/readme-hero.svg" alt="gfot — 一个项目，接着做下去。" width="100%" />
+<img src="docs/readme-hero.svg" alt="gfot" width="100%" />
 
-**同一个项目，自由选择模型。**<br />
-面向 AI 编程任务的桌面工作区。
+**面向本地 AI 编程任务的桌面客户端。**
+
+统一管理项目、Agent 会话与个人模型账号。
 
 [English](README.md) · **简体中文**
 
@@ -11,7 +12,7 @@
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
-[功能](#功能) · [快速开始](#快速开始) · [Harness²](#harness²) · [文档](#文档)
+[项目介绍](#项目介绍) · [账号接入](#账号与服务) · [Harness²](#harness²) · [安装](#安装)
 
 </div>
 
@@ -19,34 +20,42 @@
 
 ![gfot 桌面客户端](docs/desktop-preview.png)
 
-## 关于 gfot
+## 项目介绍
 
-gfot 将本地项目、任务对话与模型连接整合到一个 macOS 客户端。选择目录、连接模型，即可开始 AI 编程任务；在回合之间更换模型或账号，继续已有任务与对话。
+gfot 用于管理本地项目中的 AI 编程任务，将项目目录、任务对话、执行记录与账号连接集中在一个客户端。在回合之间更换模型或账号，即可继续已有任务。
 
-gfot 基于 Electron 与 Node.js 构建，集成 OpenCode 无界面执行服务，提供 Agent Loop 与工具执行能力；由 gfot 统一管理桌面交互、任务记录、模型连接和操作审批。
+- **围绕项目组织任务。** 选择本地目录，按任务保存对话与执行记录。
+- **使用自己的账号。** 导入已有 Codex 登录，或配置 API、本机模型服务与兼容代理。
+- **延续任务会话。** 在回合之间切换模型与账号连接，无需重新创建对话。
+- **管理执行过程。** 查看流式输出和工具活动，审批文件修改、命令与项目外目录访问。
+- **优化执行配置。** 使用 Harness² 在项目副本中评估指令配置，选择采用结果用于后续执行。
 
-## 功能
+## 账号与服务
 
-| | |
+| 接入方式 | 配置方式 |
 | --- | --- |
-| **项目与对话** | 围绕本地目录开展任务，保存对话历史和执行记录。 |
-| **模型选择** | 接入本地 Codex 登录、兼容 HTTPS API 或本机模型服务。 |
-| **任务续接** | 在同一会话的回合之间切换模型或账号连接。 |
-| **执行可见** | 查看流式回答、工具请求与执行事件。 |
-| **操作审批** | 审批文件修改、命令执行和项目外目录访问。 |
-| **凭证管理** | 账号凭证和 API Key 加密保存，主密钥由 macOS 钥匙串保护。 |
+| **Codex 本地登录** | 导入选定的 `auth.json`，将访问凭证副本加密保存在本机。 |
+| **模型 API** | 配置接口地址与 API Key，支持 Chat Completions、Responses 和 Anthropic 协议。 |
+| **本机模型** | 连接 Ollama 或运行在本机的其他兼容服务。 |
+| **本地代理** | 连接兼容代理地址，包括通过 CC Switch 配置的路由。 |
 
-### 模型连接
+Codex 凭证导入为实验功能。各项连接使用已有服务权限与账号额度，兼容性说明见[账号与认证](docs/accounts.md)。
 
-- **Codex 登录导入**：选择已有的 `auth.json`，创建本机加密凭证副本。
-- **兼容 API**：配置 Chat Completions、Responses 或 Anthropic 接口。
-- **本机服务与代理**：连接 Ollama 或兼容本地路由，包括 CC Switch 配置的路由。
+## Harness²
 
-切换连接时，任务由内置 OpenCode 执行。Codex 导入为实验功能，模型服务的兼容性与账号额度限制仍然适用。[账号与连接说明](docs/accounts.md)。
+`h2` 分支集成 Google Harness²，提供任务级指令配置优化：
 
-## 快速开始
+1. 在独立项目副本中运行基线与候选配置。
+2. 根据执行证据合成指令配置。
+3. 查看结果，选择用于同一任务的后续回合，或保留现有配置。
 
-需要 **Apple silicon Mac、Node.js 22.12+ 和 npm**。
+![Harness² 配置优化面板，模型回答为合成测试数据](docs/harness2-preview.png)
+
+优化功能需要 **Python 3.12 或 3.13**，会进行多次模型调用。探测产生的修改不会自动合并回原项目。执行限制与配置范围见 [Harness² 接入文档](docs/h2-integration.md)。
+
+## 安装
+
+需要 **Apple silicon Mac、Node.js 22.12+ 和 npm**。普通任务无需 Python。
 
 ```sh
 git clone --branch h2 https://github.com/Wayneway26/gfot.git
@@ -56,33 +65,44 @@ node node_modules/electron/install.js
 npm run desktop
 ```
 
-1. 打开 **Agent 选择**，添加模型连接。
-2. 新建任务，选择本地项目目录。
-3. 描述目标，查看执行过程并审批所需操作。
-4. 如需切换连接，结束或停止当前回合，选择其他连接继续。
+### 使用
 
-运行 `npm run dist:mac` 可构建 macOS 应用，生成的 `.app` 和 ZIP 位于 `dist/`。当前构建尚未签名或通过 Apple 公证。
+1. 打开 **Agent 选择**，配置账号或服务连接。
+2. 新建任务，选择项目目录并输入指令。
+3. 执行过程中审批工具请求。更换连接前，先结束或停止当前回合，再选择其他连接。
 
-## Harness²
+### 构建
 
-`h2` 分支集成 Google Harness²，提供可选的任务级执行配置优化。它在独立项目副本上进行探测，提出指令调整，并根据执行证据合成配置。查看结果并确认采用后，配置将用于本任务后续回合。
+```sh
+npm run dist:mac
+```
 
-![Harness² 任务面板，使用合成模型演示](docs/harness2-preview.png)
+生成的 `.app` 和 ZIP 位于 `dist/`。预览版构建尚未签名或通过 Apple 公证。
 
-此功能需要 **Python 3.12 或 3.13**，会进行多次模型调用。探测产生的修改不会自动合并回原项目。普通任务由 OpenCode 执行，无需 Python。[了解接入方式](docs/h2-integration.md)。
+## 架构
+
+| 组件 | 职责 |
+| --- | --- |
+| **gfot · Electron / Node.js** | 桌面界面、任务持久化、账号管理、本地代理与审批处理。 |
+| **OpenCode · 无界面服务** | Agent Loop、模型请求、工具执行与会话管理。 |
+| **Harness² · Python 适配层** | 可选的任务级指令配置探测、提案与合成流程。 |
+
+切换连接会改变 OpenCode 使用的模型或账号，不会切换到本机安装的 Codex、WorkBuddy 执行器。
+
+凭证在本机加密保存，主密钥由 macOS 钥匙串保护。对话和执行记录保存在本机，所配置的模型服务会接收请求所需上下文。工具审批属于应用层控制，不是操作系统沙箱。
 
 ## 文档
 
-[桌面版指南](docs/desktop-preview.md) · [账号与代理](docs/accounts.md) · [Harness² 接入](docs/h2-integration.md) · [测试报告](docs/verification.md)
-
-任务对话和执行记录保存在本机；模型推理所需的上下文会发送给所连接的服务。工具审批属于应用层控制，不是操作系统沙箱。
+[桌面版指南](docs/desktop-preview.md) · [账号与代理](docs/accounts.md) · [Harness² 接入](docs/h2-integration.md) · [验证记录](docs/verification.md)
 
 ## 参与贡献
 
-欢迎提交 [Issue](https://github.com/Wayneway26/gfot/issues) 或 Pull Request。报告问题时，请附上应用版本、连接类型与脱敏后的错误信息，避免上传凭证和私密对话记录。
+通过 [GitHub Issues](https://github.com/Wayneway26/gfot/issues) 提交问题与兼容性报告，请附上应用版本、连接类型及脱敏后的错误信息，避免上传凭证或私密对话记录。欢迎提交 Pull Request。
 
 ## 致谢
 
-使用 [Electron](https://github.com/electron/electron)、[OpenCode](https://github.com/anomalyco/opencode) 与 [Google Harness²](https://github.com/google-research/harness2) 构建，连接管理设计参考 [CC Switch](https://github.com/farion1231/cc-switch)。
+[Electron](https://github.com/electron/electron) · [OpenCode](https://github.com/anomalyco/opencode) · [Google Harness²](https://github.com/google-research/harness2) · [CC Switch](https://github.com/farion1231/cc-switch)
 
-采用 [Apache-2.0](LICENSE) 许可证，依赖许可证见[第三方声明](THIRD_PARTY_NOTICES.md)。
+## 许可证
+
+[Apache-2.0](LICENSE)。依赖许可证见[第三方声明](THIRD_PARTY_NOTICES.md)。

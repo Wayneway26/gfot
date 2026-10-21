@@ -1,9 +1,10 @@
 <div align="center">
 
-<img src="docs/readme-hero.svg" alt="gfot — One project. Keep going." width="100%" />
+<img src="docs/readme-hero.svg" alt="gfot" width="100%" />
 
-**One project. Your choice of models.**<br />
-A desktop workspace for AI coding tasks.
+**A desktop client for local AI coding tasks.**
+
+Projects, Agent sessions and your own model accounts in one place.
 
 **English** · [简体中文](README.zh-CN.md)
 
@@ -11,42 +12,50 @@ A desktop workspace for AI coding tasks.
 ![Platform](https://img.shields.io/badge/macOS-Apple%20silicon-172A4A?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-526887?style=flat-square)](LICENSE)
 
-[Features](#features) · [Quick start](#quick-start) · [Harness²](#harness²) · [Documentation](#documentation)
+[Overview](#overview) · [Accounts](#accounts-and-services) · [Harness²](#harness²) · [Installation](#installation)
 
 </div>
 
 <br />
 
-![gfot desktop](docs/desktop-preview.png)
+![gfot desktop client](docs/desktop-preview.png)
 
-## About gfot
+## Overview
 
-gfot brings local projects, task conversations and model connections into one macOS client. Open a folder, choose a connection and work with AI. Switch models or accounts between turns while continuing the same task and conversation.
+gfot is a desktop client for managing AI coding tasks in local projects. Keep project folders, conversations, execution history and account connections together, and continue a task with a different model or account between turns.
 
-Built with Electron and Node.js, gfot integrates OpenCode's headless execution service for the Agent Loop and tools. It manages the desktop interface, task records, model connections and approval controls.
+- **Project-based tasks.** Select a local folder and keep conversations and execution records with the task.
+- **Your own accounts.** Import an existing Codex login or configure an API, local model service or compatible proxy.
+- **Persistent sessions.** Switch model and account connections between turns without starting a new conversation.
+- **Execution controls.** Follow streaming output and tool activity; approve file edits, commands and access outside the project.
+- **Harness refinement.** Evaluate instruction configurations on project copies with Harness² and adopt a result for subsequent turns.
 
-## Features
+## Accounts and services
 
-| | |
+| Connection | Configuration |
 | --- | --- |
-| **Projects and conversations** | Work in a local folder with saved task history and execution records. |
-| **Model choice** | Connect a local Codex login, compatible HTTPS APIs or local model services. |
-| **Task continuity** | Change model or account connections between turns in the same session. |
-| **Visible execution** | Follow streaming responses, tool requests and execution events. |
-| **Approval controls** | Review file changes, commands and access outside the project before approving them. |
-| **Local credential storage** | Encrypt account credentials and API keys with a master key protected by macOS Keychain. |
+| **Codex local login** | Import a selected `auth.json` file. Access credentials are copied into encrypted local storage. |
+| **Model APIs** | Configure an endpoint and API key using Chat Completions, Responses or Anthropic protocols. |
+| **Local models** | Connect Ollama or another compatible service on the local machine. |
+| **Local proxies** | Connect a compatible proxy endpoint, including routes configured in CC Switch. |
 
-### Model connections
+Codex credential import is experimental. Connections use your existing service access and account allowance. See [accounts and authentication](docs/accounts.md) for compatibility details.
 
-- **Codex login import** — select an existing `auth.json` to create a local encrypted credential copy.
-- **Compatible APIs** — configure Chat Completions, Responses or Anthropic endpoints.
-- **Local services and proxies** — connect Ollama or a compatible local route, including routes configured in CC Switch.
+## Harness²
 
-Connection switching uses the bundled OpenCode executor. Codex import is experimental; provider compatibility and account limits still apply. [Account and connection details](docs/accounts.md).
+The `h2` branch integrates Google Harness² for task-level instruction refinement:
 
-## Quick start
+1. Run a baseline and candidate configurations in separate project copies.
+2. Compose an instruction configuration from the execution evidence.
+3. Review and adopt the result for later turns in the same task, or keep the current configuration.
 
-Requires **an Apple silicon Mac, Node.js 22.12+ and npm**.
+![Harness² refinement panel with synthetic-model responses](docs/harness2-preview.png)
+
+Optimization requires **Python 3.12 or 3.13** and performs multiple model calls. Probe changes are not automatically merged into the original project. See the [Harness² integration](docs/h2-integration.md) for execution limits and configuration scope.
+
+## Installation
+
+Requires **macOS on Apple silicon, Node.js 22.12+ and npm**. Python is optional for ordinary tasks.
 
 ```sh
 git clone --branch h2 https://github.com/Wayneway26/gfot.git
@@ -56,33 +65,44 @@ node node_modules/electron/install.js
 npm run desktop
 ```
 
-1. Open **Agent 选择** and add a model connection.
-2. Create a task and choose a local project folder.
-3. Describe the work, follow execution and review requested operations.
-4. To switch connections, finish or stop the current turn, select another connection and continue.
+### Usage
 
-Build a macOS application with `npm run dist:mac`. The `.app` and ZIP are written to `dist/`. Current builds are unsigned and have not been Apple-notarized.
+1. Open **Agent 选择** and configure an account or service connection.
+2. Create a task, select a project folder and enter your instructions.
+3. Review tool requests during execution. To switch connections, finish or stop the current turn and select another connection.
 
-## Harness²
+### Build
 
-The `h2` branch integrates Google's Harness² for optional task-level execution configuration refinement. It probes independent project copies, proposes instruction changes and composes a configuration from execution evidence. Review the results and explicitly adopt a configuration for later turns in that task.
+```sh
+npm run dist:mac
+```
 
-![Harness² task panel — synthetic-model demonstration](docs/harness2-preview.png)
+The `.app` and ZIP are written to `dist/`. Preview builds are unsigned and have not been Apple-notarized.
 
-Harness² requires **Python 3.12 or 3.13** and makes multiple model calls. Probe changes are not automatically merged into the original project. Ordinary tasks run through OpenCode without Python. [How the integration works](docs/h2-integration.md).
+## Architecture
+
+| Component | Responsibility |
+| --- | --- |
+| **gfot · Electron / Node.js** | Desktop interface, task persistence, account management, local proxy and approval handling. |
+| **OpenCode · headless service** | Agent Loop, model requests, tool execution and session management. |
+| **Harness² · Python adapter** | Optional probe, proposal and composition workflow for task-level instruction configurations. |
+
+Changing a connection selects the model or account used by OpenCode. It does not switch to an installed Codex or WorkBuddy execution runtime.
+
+Credentials are encrypted locally with a master key protected by macOS Keychain. Conversations and execution records are stored locally; configured providers receive the context needed for model requests. Tool approvals are application controls, not an OS sandbox.
 
 ## Documentation
 
-[Desktop guide](docs/desktop-preview.md) · [Accounts and proxies](docs/accounts.md) · [Harness² integration](docs/h2-integration.md) · [Test reports](docs/verification.md)
-
-Task conversations and execution records are stored locally; connected model services receive the context needed for inference. Tool approvals are application controls, not an operating-system sandbox.
+[Desktop guide](docs/desktop-preview.md) · [Accounts and proxies](docs/accounts.md) · [Harness² integration](docs/h2-integration.md) · [Verification](docs/verification.md)
 
 ## Contributing
 
-[Issues](https://github.com/Wayneway26/gfot/issues) and pull requests are welcome. Include the app version, connection type and a redacted error when reporting a problem. Keep credentials and private conversation logs out of reports.
+Submit bugs and compatibility reports through [GitHub Issues](https://github.com/Wayneway26/gfot/issues). Include the app version, connection type and a redacted error. Do not include credentials or private conversation logs. Pull requests are welcome.
 
 ## Acknowledgments
 
-Built with [Electron](https://github.com/electron/electron), [OpenCode](https://github.com/anomalyco/opencode) and [Google Harness²](https://github.com/google-research/harness2). Connection management design draws on [CC Switch](https://github.com/farion1231/cc-switch).
+[Electron](https://github.com/electron/electron) · [OpenCode](https://github.com/anomalyco/opencode) · [Google Harness²](https://github.com/google-research/harness2) · [CC Switch](https://github.com/farion1231/cc-switch)
 
-Licensed under [Apache-2.0](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) for dependency licenses.
+## License
+
+[Apache-2.0](LICENSE). Dependency licenses are listed in [third-party notices](THIRD_PARTY_NOTICES.md).
