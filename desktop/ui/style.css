@@ -166,3 +166,7 @@ dialog .actions { display: flex; justify-content: flex-end; gap: 9px; margin-top
 .prompt-preview pre { font-size: 11px; line-height: 1.8; }
 #runtime-note { white-space: pre-line; }
 @media (max-width: 1040px) { .agent-toolbar { flex-wrap: wrap; } .agent-toolbar select { max-width: 150px; } }
+
+.settings-heading { display: flex; align-items: center; justify-content: space-between; position: sticky; top: -28px; background: white; z-index: 2; padding: 10px 0; }
+.settings-heading h2 { margin: 0; }
+#settings-dismiss { border: 0; font-size: 20px; line-height: 1; padding: 7px 10px; }

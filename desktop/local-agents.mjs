@@ -32,7 +32,7 @@ export function createAgentRegistry({appRoots=['/Applications',join(homedir(),'A
 // Shared text is explicit task history, never an Agent's private chain of thought.
 export function continuationText(task,text,{fresh=false,cursor=0,maxChars=60000}={}){
  const history=task.messages.slice(0,-1).slice(fresh?0:cursor);
- const blocks=history.map(m=>`[${m.role}${m.agentId?' / '+m.agentId:''}]\n${m.text}`);
+ const blocks=history.map(m=>`[${m.role}${m.agentId?' / '+m.agentId:''}${m.interrupted?' / interrupted':''}]\n${m.text}`);
  let size=0,start=blocks.length;
  while(start>0&&size+blocks[start-1].length+2<=maxChars){start--;size+=blocks[start].length+2;}
  const notes=task.contextNotes?`\nShared task notes:\n${task.contextNotes}\n`:'';

@@ -39,5 +39,27 @@ test('native CLI login requires desktop authority, cancels cleanly and blocks ta
   const r=await call('agents/login/start',{id:'workbuddy'});assert.equal(r.status,200);const login=await r.json();assert.equal(login.status,'pending');await wait(()=>release);
   const state=await (await fetch(service.url+'/api/state',{headers:{authorization:'Bearer '+service.auth}})).json();assert.equal(state.agents.find(a=>a.id==='workbuddy').login.status,'pending');
   assert.equal((await call('agents/login/cancel',{id:login.id})).status,200);
+  const after=await (await fetch(service.url+'/api/state',{headers:{authorization:'Bearer '+service.auth}})).json();assert.equal(after.agents.find(a=>a.id==='workbuddy').login.status,'cancelled');
+ }finally{await service?.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('a native session created before a first-turn failure survives switching away and restart',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'gfot-failed-session-')),key=randomBytes(32);let service;const starts=[];
+ const acpFactory=o=>({async start(){starts.push(o.task.sessionId);o.task.sessionId||='native-error-session';},async send(){throw Error('fixture provider failure');},async stop(){}});
+ const start=()=>startDesktopServer({dataDir:dir,key,agentRegistry:registry,acpFactory});
+ const call=async(route,body)=>{const r=await fetch(service.url+'/api/'+route,{method:'POST',headers:{authorization:'Bearer '+service.auth,'content-type':'application/json'},body:JSON.stringify(body)});assert.ok(r.ok);return r.json();};
+ try{service=await start();const {taskId}=await call('tasks',{folder:dir,agentId:'fixture-acp'});await call('tasks/'+taskId+'/prompt',{text:'first'});await wait(()=>service.state.tasks[0].status==='error');assert.equal(service.state.tasks[0].agentSessions['fixture-acp'].sessionId,'native-error-session');
+  await call('tasks/'+taskId+'/agent',{agentId:'opencode'});await service.close();service=await start();await call('tasks/'+taskId+'/agent',{agentId:'fixture-acp'});await call('tasks/'+taskId+'/prompt',{text:'retry'});await wait(()=>service.state.tasks[0].status==='error');assert.deepEqual(starts,[null,'native-error-session']);
+ }finally{await service?.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('stopping preserves redacted partial output so the next Agent can continue visible work',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'gfot-partial-'));let service,release;const seen=[];
+ const acpFactory=o=>({async start(){o.task.sessionId='partial-session';},async send(){o.onEvent({type:'message.part.delta',properties:{sessionID:o.task.sessionId,field:'text',delta:'Completed part A; part B remains.'}});await new Promise(r=>release=r);throw Error('cancelled');},async stop(){release?.();}});
+ const engineFactory=o=>({async start(){o.task.sessionId='builtin-session';},async send(text){seen.push(text);return {info:{}};},async history(){return [];},async stop(){}});
+ const registryArgs={dataDir:dir,key:randomBytes(32),agentRegistry:registry,acpFactory,engineFactory};
+ const call=async(route,body)=>{const r=await fetch(service.url+'/api/'+route,{method:'POST',headers:{authorization:'Bearer '+service.auth,'content-type':'application/json'},body:JSON.stringify(body)});assert.ok(r.ok);return r.json();};
+ try{service=await startDesktopServer(registryArgs);const {taskId}=await call('tasks',{folder:dir,agentId:'fixture-acp'});await call('tasks/'+taskId+'/prompt',{text:'do work'});await wait(()=>release);await call('tasks/'+taskId+'/stop',{});await wait(()=>service.state.tasks[0].status==='stopped');const last=service.state.tasks[0].messages.at(-1);assert.equal(last.interrupted,true);assert.equal(last.text,'Completed part A; part B remains.');
+  const p=(await call('profiles',{label:'Synthetic',baseURL:'http://localhost:1234/v1',model:'x'})).profiles[0];await call('tasks/'+taskId+'/agent',{agentId:'opencode'});await call('tasks/'+taskId+'/prompt',{text:'continue',profileId:p.id});await wait(()=>service.state.tasks[0].status==='idle');assert.ok(seen[0].includes('Completed part A'));assert.ok(seen[0].includes('interrupted'));
  }finally{await service?.close();rmSync(dir,{recursive:true,force:true});}
 });

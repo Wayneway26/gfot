@@ -49,7 +49,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
   else if(event.type==='session.error'){task.error=JSON.stringify(properties.error||{}).slice(0,3000);changed();}
  }
  async function run(task,text,profile,agent){
-  const runtime={engine:null,cancelled:false};let finalStatus='idle',grant;active.set(task.id,runtime);
+  const runtime={engine:null,cancelled:false};let finalStatus='idle',grant,outputRecorded=false;active.set(task.id,runtime);
   const deadline=setTimeout(()=>{runtime.cancelled=true;task.error='本轮超过 15 分钟，已请求停止。核对执行记录后再继续。';void runtime.engine?.stop();},15*60*1000);
   try{
    const slots=task.agentSessions||={};
@@ -59,8 +59,9 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    if(agent.kind==='builtin'&&profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
    const engine=runtime.engine=agent.kind==='builtin'?engineFactory({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event)}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event)});
-   await engine.start();if(runtime.cancelled)return;
-   task.sessionId=engineTask.sessionId;
+   await engine.start();
+   slots[agent.id]={sessionId:engineTask.sessionId,cursor:wasFresh||engine.resumed===false?0:saved.cursor||0};
+   task.sessionId=engineTask.sessionId;storage.save();if(runtime.cancelled)return;
    const transfer=continuationText(task,text,{fresh:wasFresh||engine.resumed===false,cursor:saved.cursor||0});
    let outgoing=transfer.text;
    if(agent.kind==='acp'&&task.adoptedHarness)outgoing='Task instructions explicitly adopted by the user:\n'+harnessPrompt(task.adoptedHarness.tree)+'\n\n'+outgoing;
@@ -71,14 +72,14 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    const lastUser=history.findLastIndex(m=>m.info?.role==='user');
    for(const m of history.slice(lastUser+1).filter(m=>m.info?.role==='assistant')){
     const answerText=(m.parts||[]).filter(p=>p.type==='text').map(p=>p.text||'').join('\n');
-    if(answerText)task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:answerText,at:new Date(m.info.time?.created||Date.now()).toISOString()});
+    if(answerText){task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:answerText,at:new Date(m.info.time?.created||Date.now()).toISOString()});outputRecorded=true;}
    }
    slots[agent.id]={sessionId:engineTask.sessionId,cursor:task.messages.length};
    if(agent.kind==='acp'){state.agentChecks||={};state.agentChecks[agent.id]={at:new Date().toISOString(),connected:true,inference:true};}
    if(answer?.info?.error)throw Error(JSON.stringify(answer.info.error));
    task.error=null;addEvent(task,{type:'done',text:'本轮执行已结束，请检查实际变更与验证结果。'});
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);addEvent(task,{type:'error',text:task.error});}}
-  finally{clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();task.status=runtime.cancelled?'stopped':finalStatus;task.pending=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
+  finally{clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();if(!outputRecorded&&task.draft?.trim()&&(runtime.cancelled||finalStatus==='error'))task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:task.draft,interrupted:true,at:new Date().toISOString()});task.status=runtime.cancelled?'stopped':finalStatus;task.pending=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
  }
  async function runHarness(task,text,profile){
   const runtime={engine:null,cancelled:false,harness2:true};let grant,finalStatus='idle';active.set(task.id,runtime);
@@ -128,7 +129,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
     const id=randomUUID(),folder=mkdtempSync(join(tmpdir(),'gfot-agent-login-'));
     const engine=acpFactory({launch:agents.command(agent.id),task:{folder,sessionId:null}}),login={agentId:agent.id,engine,public:{id,status:'pending',note:'请在浏览器中完成 CLI 登录；gfot 不读取登录 Token。'}};
     for(const [oldId,old] of nativeLogins)if(old.agentId===agent.id)nativeLogins.delete(oldId);nativeLogins.set(id,login);changed();
-    const pending=(async()=>{try{await engine.start();const methodId=agent.id==='workbuddy'?'internal':'external';if(!engine.info.authMethods?.some(m=>m.id===methodId))throw Error('此版本没有相应的 CLI 登录方式');await engine.request('authenticate',{methodId},5*60*1000);login.public.status='complete';login.public.note='CLI 登录完成，可返回任务发送消息验证执行。';}
+    const pending=(async()=>{try{await engine.start();const methodId=agent.id==='workbuddy'?'internal':'external';if(!engine.info.authMethods?.some(m=>m.id===methodId))throw Error('此版本没有相应的 CLI 登录方式');await engine.request('authenticate',{methodId},5*60*1000);if(login.public.status==='pending'){login.public.status='complete';login.public.note='CLI 登录完成，可返回任务发送消息验证执行。';}}
      catch(error){if(login.public.status==='pending'){login.public.status='error';login.public.note=safe(String(error.message)).slice(0,1000);}}
      finally{await engine.stop();rmSync(folder,{recursive:true,force:true});changed();}})();
     pendingRuns.add(pending);void pending.finally(()=>pendingRuns.delete(pending));return send(200,login.public);

@@ -28,7 +28,7 @@ export class AcpEngine{
   }
   if(message.id===undefined)return;
   if(message.method==='session/request_permission'&&message.params?.sessionId===this.task.sessionId){
-   const p=message.params,id=String(message.id);if(this.readOnly){this.write({id:message.id,result:{outcome:{outcome:'cancelled'}}});return;}
+   const p=message.params,id=String(message.id);if(this.readOnly||this.cancelling){this.write({id:message.id,result:{outcome:{outcome:'cancelled'}}});return;}
    this.permissions.set(id,{rpcId:message.id,options:p.options||[]});
    this.onEvent({type:'permission.asked',properties:{id,sessionID:this.task.sessionId,permission:p.toolCall?.title||p.toolCall?.kind||'Agent 工具',patterns:p.toolCall?.locations?.map(l=>l.path)||[],metadata:p.toolCall?.rawInput||{}}});return;
   }
@@ -55,12 +55,14 @@ export class AcpEngine{
    if(typeof session?.sessionId!=='string'||!session.sessionId)throw Error('Agent 未返回会话 ID');this.task.sessionId=session.sessionId;this.resumed=false;
   }
  }
- async send(text){this.output='';const result=await this.request('session/prompt',{sessionId:this.task.sessionId,prompt:[{type:'text',text}]},15*60*1000);if(result.stopReason!=='end_turn'){const nativeError=result._meta?.['codebuddy.ai/errorMessage']||'';if(nativeError.includes('Authentication required'))throw new InputError('此 Agent 的 CLI 尚未登录。请通过其 CLI 完成登录；桌面应用登录不一定与 CLI 共享。');throw Error('Agent 本轮未完成：'+result.stopReason);}return {info:{},parts:[{type:'text',text:this.output}]};}
+ async send(text){this.output='';this.turnPromise=this.request('session/prompt',{sessionId:this.task.sessionId,prompt:[{type:'text',text}]},15*60*1000);const result=await this.turnPromise;if(this.cancelling)throw Error('Agent 已停止');if(result.stopReason!=='end_turn'){const nativeError=result._meta?.['codebuddy.ai/errorMessage']||'';if(nativeError.includes('Authentication required'))throw new InputError('此 Agent 的 CLI 尚未登录。请通过其 CLI 完成登录；桌面应用登录不一定与 CLI 共享。');throw Error('Agent 本轮未完成：'+result.stopReason);}return {info:{},parts:[{type:'text',text:this.output}]};}
  async history(){return [{info:{id:randomUUID(),role:'assistant',time:{created:Date.now()}},parts:[{type:'text',text:this.output}]}];}
  async permission(id,reply){const p=this.permissions.get(id);if(!p)throw new InputError('审批请求已失效');const choice=p.options.find(o=>o.kind===(reply==='once'?'allow_once':'reject_once'));if(!choice&&reply==='once')throw new InputError('Agent 未提供单次批准选项');this.write({id:p.rpcId,result:{outcome:choice?{outcome:'selected',optionId:choice.optionId}:{outcome:'cancelled'}}});this.permissions.delete(id);}
  async question(){throw new InputError('此 Agent 未提供结构化问题接口');}
  stop(){return this.stopping||=(async()=>{
+  this.cancelling=true;
   if(!this.stopped){try{for(const p of this.permissions.values())this.write({id:p.rpcId,result:{outcome:{outcome:'cancelled'}}});if(this.task.sessionId)this.write({method:'session/cancel',params:{sessionId:this.task.sessionId}});}catch{}}
+  if(this.turnPromise)await Promise.race([this.turnPromise.catch(()=>{}),new Promise(r=>setTimeout(r,750))]);
   this.permissions.clear();this.stopped=true;this.fail(Error('Agent 已停止'));const pid=this.child?.pid;if(!pid)return;
   try{process.kill(-pid,'SIGTERM');}catch{}
   await Promise.race([this.exit,new Promise(r=>setTimeout(r,700))]);

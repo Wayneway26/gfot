@@ -29,7 +29,7 @@ Sessions can fail to resume after native data removal or an incompatible app upd
 
 ACP text and tool notifications are normalized into gfot's execution timeline. Permission requests expose only allow-once/reject actions; no automatic always-allow grant is sent. Other client capabilities, including filesystem and terminal services, are not advertised. Native Agents still perform their own tools and apply their own configured policy. gfot is not an OS sandbox.
 
-The supervisor keeps the CLI and tools in one process group and terminates the group if gfot's service disappears. Stop cancels pending ACP permissions and requests, then terminates the group. Native stderr and non-protocol output are discarded, so native authentication logs and HTTP passwords are not persisted in gfot.
+The supervisor owns the CLI and descendants that remain in its process group, and terminates that group if gfot's service disappears. Stop cancels pending ACP permissions, sends session/cancel, gives the current turn a bounded opportunity to acknowledge cancellation, then terminates the owned group. A pre-existing native background service is not owned or killed by gfot. Native tool cancellation outside the owned process group has not been validated; the adapter relies on the Agent's session/cancel implementation. Native stderr and non-protocol output are discarded, so native authentication logs and HTTP passwords are not persisted in gfot.
 
 ## Harness² prompt refinement
 
