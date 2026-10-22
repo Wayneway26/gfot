@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
 import {createAgentRegistry,continuationText} from './local-agents.mjs';
 import {ensureProject,recordTool,observeWorkspace,checkpoint,sharedContext,classifyFailure,continuationRequest} from './task-context.mjs';
+import {beginExecution,executionPhase,toolActivity,finishExecution} from './execution-state.mjs';
 import {AcpEngine} from './acp-engine.mjs';
 import {DoubaoEngine} from './doubao-engine.mjs';
 import {createStore,publicState,newTask,profileInput,vault,requireText,InputError} from './state.mjs';
@@ -15,7 +16,7 @@ import {listModels,verifyConnection} from './connections.mjs';
 import {createAccountManager} from './accounts.mjs';
 import {startAccountProxy,verifyResponses} from './account-proxy.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
-const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/brand-mark.svg':'brand-mark.svg'};
+const files={'/':'index.html','/app.js':'app.js','/render.js':'render.js','/style.css':'style.css','/brand-mark.svg':'brand-mark.svg'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
 export async function startDesktopServer({dataDir,binary,key,harnessRunner,connectionFetch=fetch,accountFetch=fetch,agentRegistry,agentAppRoots,doubaoRoot,workspaceObserver=observeWorkspace,doubaoFactory=options=>new DoubaoEngine(options),acpFactory=options=>new AcpEngine(options),engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;const switches=new Map(),reservations=new Set();
@@ -37,18 +38,24 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
   const raw=event.properties||{};if(!active.get(task.id)?.harness2&&raw.sessionID&&task.sessionId&&raw.sessionID!==task.sessionId)return;
   const properties=safe(raw);for(const field of ['id','sessionID'])if(raw[field]!==undefined)properties[field]=raw[field];
   if(properties.part)for(const field of ['id','messageID','sessionID'])if(raw.part[field]!==undefined)properties.part[field]=raw.part[field];
+  const boundary=()=>{const runtime=active.get(task.id);if(!runtime)return;if(task.draft?.trim())task.liveProgress=[...(task.liveProgress||[]),task.draft].slice(-20).map(t=>t.slice(-5000));runtime.rawDraft='';task.draft='';storage.save();};
+  const selectPart=id=>{const runtime=active.get(task.id);if(!runtime||!id)return;if(runtime.draftPartId&&runtime.draftPartId!==id)boundary();runtime.draftPartId=id;};
   const draft=value=>{
    const runtime=active.get(task.id);if(!runtime)return;runtime.rawDraft=value.slice(-100000);let hidden=0;
    for(const secret of [...state.profiles.map(p=>secrets.open(p.secret)),runtime.engine?.password,runtime.engine?.key,...accounts.sensitiveValues()].filter(Boolean))for(let n=Math.min(secret.length-1,runtime.rawDraft.length);n>hidden;n--)if(runtime.rawDraft.endsWith(secret.slice(0,n))){hidden=n;break;}
-   task.draft=safe(hidden?runtime.rawDraft.slice(0,-hidden)+'[redacted]':runtime.rawDraft);changed();
+   task.draft=safe(hidden?runtime.rawDraft.slice(0,-hidden)+'[redacted]':runtime.rawDraft);executionPhase(task,'output');changed();
   };
-  if(event.type==='permission.asked'||event.type==='permission.updated'){if(!task.pending.some(p=>p.id===properties.id))task.pending.push({...properties,kind:'permission'});task.status='permission';addEvent(task,{type:'permission',text:'等待批准：'+(properties.permission||properties.type||'工具操作')});}
-  else if(event.type==='question.asked'){task.pending.push({...properties,kind:'question'});task.status='permission';addEvent(task,{type:'question',text:'执行器需要你的回答'});}
+  if(event.type==='permission.asked'||event.type==='permission.updated'){if(!task.pending.some(p=>p.id===properties.id))task.pending.push({...properties,kind:'permission'});task.status='permission';executionPhase(task,'permission');addEvent(task,{type:'permission',text:'等待批准：'+(properties.permission||properties.type||'工具操作')});}
+  else if(event.type==='question.asked'){task.pending.push({...properties,kind:'question'});task.status='permission';executionPhase(task,'permission');addEvent(task,{type:'question',text:'执行器需要你的回答'});}
   else if(event.type==='message.part.updated'){
    const part=properties.part;if(!part)return;
-   if(part.type==='text'){draft(String(raw.part.text||''));}
-   if(part.type==='tool'){if(!active.get(task.id)?.harness2)recordTool(task,part);const status=part.state?.status||'';const text=(part.tool||'工具')+' · '+status;const last=task.events.at(-1);if(last?.partID===part.id){last.text=text;last.detail=JSON.stringify(part.state?.input||{}).slice(0,4000);changed();}else addEvent(task,{type:'tool',partID:part.id,text,detail:JSON.stringify(part.state?.input||{}).slice(0,4000)});}
-  }else if(event.type==='message.part.delta'&&properties.field==='text'){draft((active.get(task.id)?.rawDraft||'')+String(raw.delta||''));}
+   if(part.type==='reasoning'){executionPhase(task,'thinking');changed();}
+   if(part.type==='text'){selectPart(raw.part.id);draft(String(raw.part.text||''));}
+   if(part.type==='tool'){toolActivity(task,part);if(!active.get(task.id)?.harness2)recordTool(task,part);const status=part.state?.status||'';const text=(part.tool||'工具')+' · '+status;const last=task.events.at(-1);if(last?.partID===part.id){last.text=text;last.detail=JSON.stringify(part.state?.input||{}).slice(0,4000);changed();}else addEvent(task,{type:'tool',partID:part.id,text,detail:JSON.stringify(part.state?.input||{}).slice(0,4000)});}
+  }else if(event.type==='gfot.activity'){executionPhase(task,properties.phase,properties.detail);changed();}
+  else if(event.type==='gfot.output.boundary'){boundary();changed();}
+  else if(event.type==='message.part.delta'&&properties.field==='reasoning'){executionPhase(task,'thinking');changed();}
+  else if(event.type==='message.part.delta'&&properties.field==='text'){selectPart(raw.partID);draft((active.get(task.id)?.rawDraft||'')+String(raw.delta||''));}
   else if(event.type==='session.error'){task.error=JSON.stringify(properties.error||{}).slice(0,3000);changed();}
  }
  async function stopExecutor(runtime,task){
@@ -76,40 +83,43 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    if(outgoing.length>60000)throw new InputError('共享记忆、执行指令与本条消息超过上下文预算，请缩短项目或任务记忆后继续。');
    task.lastTransfer={at:new Date().toISOString(),agentId:agent.id,characters:outgoing.length,historyForwarded:transfer.forwarded,historyOmitted:transfer.omitted,evidenceOmitted:packet.omittedEvidence,tools:packet.toolCount};storage.save();
    if(transfer.forwarded||transfer.omitted)addEvent(task,{type:'handoff',text:'共享上下文：'+transfer.forwarded+' 条对话'+(transfer.omitted?'；较早的 '+transfer.omitted+' 条未传递，请补充任务备注。':'' )});
-   task.status='running';storage.save();changed();
+   task.status='running';executionPhase(task,'waiting');storage.save();changed();
    const answer=await engine.send(outgoing);if(runtime.cancelled)return;
+   executionPhase(task,'finishing');changed();
    const history=safe(await engine.history());
    const lastUser=history.findLastIndex(m=>m.info?.role==='user');
-   for(const m of history.slice(lastUser+1).filter(m=>m.info?.role==='assistant')){
+   const answers=history.slice(lastUser+1).filter(m=>m.info?.role==='assistant'&&(m.parts||[]).some(p=>p.type==='text'&&p.text));
+   for(const [index,m] of answers.entries()){
     const answerText=(m.parts||[]).filter(p=>p.type==='text').map(p=>p.text||'').join('\n');
-    if(answerText){task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:answerText,at:new Date(m.info.time?.created||Date.now()).toISOString()});outputRecorded=true;}
+    if(answerText){task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:answerText,presentation:m.info.presentation||(!answer?.info?.error&&index===answers.length-1?'final':'progress'),at:new Date(m.info.time?.created||Date.now()).toISOString()});outputRecorded=true;}
    }
    slots[agent.id]={sessionId:engineTask.sessionId,cursor:task.messages.length};
    if(agent.kind!=='builtin'){state.agentChecks||={};state.agentChecks[agent.id]={at:new Date().toISOString(),connected:true,inference:true};}
+   if(outputRecorded){task.liveProgress=[];task.draft='';runtime.rawDraft='';}
    if(answer?.info?.error)throw Error(JSON.stringify(answer.info.error));
    task.blocked=null;task.error=null;addEvent(task,{type:'done',text:'本轮执行已结束，请检查实际变更与验证结果。'});
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);task.blocked={kind:classifyFailure(task.error),agentId:agent.id,at:new Date().toISOString()};addEvent(task,{type:'error',text:task.error});}}
-  finally{clearTimeout(deadline);let stopFailed=false;try{await stopExecutor(runtime,task);}catch(error){stopFailed=true;task.error=safe(error.message);addEvent(task,{type:'error',text:task.error});}grant?.revoke();if(!outputRecorded&&task.draft?.trim()&&(runtime.cancelled||finalStatus==='error'))task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:task.draft,interrupted:true,at:new Date().toISOString()});const finishedStatus=stopFailed?'error':runtime.cancelled?'stopped':finalStatus;task.pending=[];task.draft='';const workspace=await workspaceObserver(task.folder);task.status=finishedStatus;task.checkpoint=checkpoint(task,workspace);active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();runtime.finish();}
+  finally{clearTimeout(deadline);let stopFailed=false;try{await stopExecutor(runtime,task);}catch(error){stopFailed=true;task.error=safe(error.message);addEvent(task,{type:'error',text:task.error});}grant?.revoke();if(!outputRecorded&&(runtime.cancelled||finalStatus==='error')){const partial=[...(task.liveProgress||[]),task.draft].filter(Boolean).join('\n\n').slice(-100000);if(partial.trim())task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:partial,presentation:'progress',interrupted:true,at:new Date().toISOString()});}const finishedStatus=stopFailed?'error':runtime.cancelled?'stopped':finalStatus;task.pending=[];task.liveProgress=[];task.draft='';const workspace=await workspaceObserver(task.folder);task.status=finishedStatus;finishExecution(task,finishedStatus);task.checkpoint=checkpoint(task,workspace);active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();runtime.finish();}
  }
  async function runHarness(task,text,profile){
-  const runtime={engine:null,cancelled:false,harness2:true};let grant,finalStatus='idle';active.set(task.id,runtime);
+  beginExecution(task);const runtime={engine:null,cancelled:false,harness2:true};let grant,finalStatus='idle';active.set(task.id,runtime);
   task.harnessRun={status:'running',runId:randomUUID(),startedAt:new Date().toISOString(),phases:[]};
   const deadline=setTimeout(()=>{runtime.cancelled=true;void runtime.engine?.stop().catch(error=>{task.error=safe(error.message);changed();});},15*60*1000);
   try{
    if(profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
    const engine=runtime.engine=new Harness2Engine({binary,dataDir,harnessRunner,task,prompt:text,profile:resolved,key:grant?.key||secrets.open(profile.secret),engineFactory,redact:safe,
-    onEvent:event=>onEvent(task,event),onPhase:phase=>{task.pending=[];task.draft='';task.status='running';task.harnessRun.phases.push(phase);task.harnessRun.phase=phase;addEvent(task,{type:'harness2',text:'Harness² · '+phase.label+' · '+(phase.action==='propose'?'提出配置':'副本探测')});}});
+    onEvent:event=>onEvent(task,event),onPhase:phase=>{task.pending=[];task.liveProgress=[];task.draft='';task.status='running';executionPhase(task,'working','提示词优化 · '+phase.label);task.harnessRun.phases.push(phase);task.harnessRun.phase=phase;addEvent(task,{type:'harness2',text:'Harness² · '+phase.label+' · '+(phase.action==='propose'?'提出配置':'副本探测')});}});
    await engine.start();if(runtime.cancelled)return;const result=safe(await engine.send());if(runtime.cancelled)return;
    task.harnessRun={...task.harnessRun,status:result.successful?'ready':'failed',result,completedAt:new Date().toISOString()};
    task.messages.push({id:randomUUID(),role:'assistant',text:'Harness² 优化'+(result.successful?'完成，配置等待你确认采用。':'未通过，不能采用配置。')+' 原项目未自动写回。'+(result.method?.ledger?' 探测 '+result.method.ledger.R+' 次，配置阶段 '+result.method.ledger.P+' 次。':''),at:new Date().toISOString()});
    task.error=null;
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);task.harnessRun.status='failed';addEvent(task,{type:'error',text:task.error});}}
-  finally{clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();if(runtime.cancelled)task.harnessRun.status='stopped';task.status=runtime.cancelled?'stopped':finalStatus;task.pending=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
+  finally{clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();if(runtime.cancelled)task.harnessRun.status='stopped';task.status=runtime.cancelled?'stopped':finalStatus;finishExecution(task,task.status);task.pending=[];task.liveProgress=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
  }
 
  function launch(task,text,profile,agent,{continuation=false}={}){
-  if(profile)task.profileId=profile.id;task.executorKind=agent.kind;task.status='starting';task.error=null;task.blocked=null;task.pending=[];task.draft='';
+  if(profile)task.profileId=profile.id;task.executorKind=agent.kind;task.status='starting';task.error=null;task.blocked=null;task.pending=[];task.liveProgress=[];task.draft='';beginExecution(task);
   task.messages.push({id:randomUUID(),role:'user',agentId:agent.id,text:safe(text),continuation,at:new Date().toISOString()});storage.save();
   const execution=run(task,text,profile?structuredClone(profile):null,agent);pendingRuns.add(execution);void execution.finally(()=>pendingRuns.delete(execution));changed();
  }
@@ -133,7 +143,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
   if(input.resume===true)reservations.add(task.id);
   const from=task.agentId;task.transition={targetId:agent.id,startedAt:new Date().toISOString()};storage.save();changed();
   const operation=Promise.resolve().then(async()=>{try{
-   if(runtime){runtime.cancelled=true;try{await stopExecutor(runtime,task);let timer;try{await Promise.race([runtime.finished,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('旧执行器尚未确认结束，暂不能切换')),70000);})]);}finally{clearTimeout(timer);}}catch(error){throw new InputError('交接未完成：'+safe(error.message));}}
+   if(runtime){runtime.cancelled=true;executionPhase(task,'stopping');try{await stopExecutor(runtime,task);let timer;try{await Promise.race([runtime.finished,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('旧执行器尚未确认结束，暂不能切换')),70000);})]);}finally{clearTimeout(timer);}}catch(error){throw new InputError('交接未完成：'+safe(error.message));}}
    if(closed)throw new InputError('服务正在关闭');
    if(nativeTurnPending(task))throw new InputError('原生 Agent 上一轮尚未确认结束，请先核对并确认，暂不能交接给其他 Agent');
    task.checkpoint=checkpoint(task,await workspaceObserver(task.folder));
@@ -281,11 +291,11 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
     const text=requireText(input.text,'任务内容');const agent=agents.get(task.agentId||'opencode');if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');const profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(agent.kind==='builtin'&&!profile)throw new InputError('请选择可用的连接');
     launch(task,text,profile,agent);return send(202,{started:true});
    }
-   if(match[2]==='stop'){if(runtime){runtime.cancelled=true;void runtime.engine?.stop().catch(error=>{task.error=safe(error.message);changed();});}return send(200,{stopping:!!runtime});}
+   if(match[2]==='stop'){if(runtime){runtime.cancelled=true;executionPhase(task,'stopping');changed();void runtime.engine?.stop().catch(error=>{task.error=safe(error.message);changed();});}return send(200,{stopping:!!runtime});}
    if(!runtime)throw new InputError('执行已结束');const pending=task.pending.find(p=>p.id===input.id);if(!pending)throw new InputError('请求已失效');
    if(match[2]==='permission'){if(pending.kind!=='permission'||!['once','reject'].includes(input.reply))throw new InputError('请选择批准一次或拒绝');await runtime.engine.permission(input.id,input.reply);}
    else{if(pending.kind!=='question'||!Array.isArray(input.answers)||!input.answers.every(a=>Array.isArray(a)&&a.every(s=>typeof s==='string')))throw new InputError('请回答问题');await runtime.engine.question(input.id,input.answers);}
-   task.pending=task.pending.filter(p=>p.id!==input.id);task.status=task.pending.length?'permission':'running';changed();return send(200,{ok:true});
+   task.pending=task.pending.filter(p=>p.id!==input.id);task.status=task.pending.length?'permission':'running';if(task.execution?.phase==='permission')executionPhase(task,task.pending.length?'permission':'waiting');changed();return send(200,{ok:true});
   }catch(error){send(error instanceof InputError?400:500,{error:error instanceof InputError?error.message:'操作失败：请检查连接和执行器状态'});}
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});origin='http://127.0.0.1:'+server.address().port;

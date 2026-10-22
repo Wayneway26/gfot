@@ -7,6 +7,12 @@ createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line)
  if(m.method==='session/new')return send({id:m.id,result:{sessionId}});
  if(m.method==='session/load'){sessionId=m.params.sessionId;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'old replay'}});return send({id:m.id,result:{}});}
  if(m.method==='session/prompt'){
+  if(m.params.prompt?.[0]?.text?.endsWith('GFOT_PROGRESS_UI')){
+   update({sessionUpdate:'agent_thought_chunk',content:{type:'text',text:'PRIVATE_THOUGHT_FIXTURE'}});
+   setTimeout(()=>{update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'先检查项目结构。'}});update({sessionUpdate:'tool_call',toolCallId:'progress-read',title:'read',status:'in_progress',rawInput:{file:'fixture.txt'}});},700);
+   setTimeout(()=>{update({sessionUpdate:'tool_call_update',toolCallId:'progress-read',title:'read',status:'completed',rawOutput:'fixture read'});update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'## 已完成\n- **检查通过**\n```js\nconsole.log("done")\n```'}});send({id:m.id,result:{stopReason:'end_turn'}});},2000);return;
+  }
+
   if(process.env.FIXTURE_MODE==='unconfirmed'){pending=m.id;return;}
   if(m.params.prompt?.[0]?.text?.endsWith('GFOT_QUOTA_UI'))return send({id:m.id,result:{stopReason:'refusal',_meta:{'codebuddy.ai/errorMessage':'usage_limit_reached'}}});
   if(process.env.FIXTURE_MODE==='oversize'){process.stdout.write('x'.repeat(2000001));return;}

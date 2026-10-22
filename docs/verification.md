@@ -62,3 +62,9 @@ The source Electron workflow passed with synthetic Agent transports and real bun
 A separate authorized native diagnostic used the actual installed OpenCode and Doubao, with fixed files in a new temporary project. OpenCode inspected the input and saved tool evidence; a switch-and-continue operation handed the same task/project to Doubao, which created the expected output file and passed a read-back check. No repository content or credentials were exported. See [native diagnostic](dynamic-native-diagnostic.json). This is not a real Codex-quota exhaustion or WorkBuddy-login validation.
 
 The [two-axis review](dynamic-switching-review.md) identified and verified the lifecycle, preflight and evidence fixes. Builds remain unsigned macOS arm64 builds. Uniform native quota queries, automatic provider failover, private reasoning/cache migration and a Qianwen executor are not claimed.
+
+## Execution feedback and readable responses — 2026-10-22
+
+gfot 0.7.1-h2.1: 125 automated tests passed with zero failures or skips. Syntax checks passed. Source and packaged Electron workflows validate actual thought signals as status only, tool activity, approvals, frozen elapsed time, collapsed public progress, formatted final answers and native clipboard copy. Interrupted public segments survive restart without duplication. Standards and Spec reviews completed follow-up with no remaining findings.
+
+[Packaged UI report](execution-ui-check.json) · [Interface capture](execution-answer.png) · [Acceptance criteria](execution-ui-spec.md). The UI workflows use synthetic providers and temporary projects; they do not validate additional paid-provider capabilities. Granular thinking and tool states appear only when the selected adapter reports them.

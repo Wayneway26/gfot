@@ -51,6 +51,7 @@ export class DoubaoEngine{
   const id=randomUUID();const approved=new Promise(resolve=>{this.approval={id,resolve};});
   this.onEvent({type:'permission.asked',properties:{id,sessionID:this.task.sessionId,permission:'授权豆包执行本轮任务（含原生文件与命令工具）',patterns:[this.task.folder],metadata:{scope:'one native turn',note:'豆包执行自己的工具策略；gfot 不能逐项拦截。遇到未适配的原生确认会停止。'}}});
   if(!await approved||this.cancelled)throw Error('本轮豆包执行未获授权');
+  this.onEvent({type:'gfot.activity',properties:{phase:'waiting',detail:'等待豆包接收任务'}});
   await this.identity();if(this.cancelled)throw Error('豆包执行已停止');this.session.pending=true;this.session.runId=null;this.save();
   let acceptedResolve;this.accepted=new Promise(resolve=>{acceptedResolve=resolve;});
   const receipt=r=>{if(r?.conversationId&&r?.runId){this.session.conversationId=r.conversationId;this.session.runId=r.runId;this.save();acceptedResolve();if(this.cancelled)void this.stop().catch(error=>this.onEvent({type:'session.error',properties:{error:{message:error.message}}}));}};
@@ -63,6 +64,7 @@ export class DoubaoEngine{
    while(!this.cancelled){
     await this.identity();const state=await this.invoke('status',[this.session.conversationId,{runId:this.session.runId}]);
     if(state.reply?.text)this.emit(state.reply.text);
+    else this.onEvent({type:'gfot.activity',properties:{phase:'working',detail:'豆包正在执行，等待状态更新'}});
     if(terminal.has(state.status)){this.session.pending=false;this.save();if(state.status!=='completed')throw Error('豆包本轮未完成：'+state.status);return {info:{},parts:[{type:'text',text:this.output}]};}
     if(state.status==='waiting_input')throw Error('豆包请求原生确认或补充输入，当前版本尚未适配该控件；已请求停止此轮，请在 gfot 补充要求后重新发送。');
     if(Date.now()>=deadline)throw Error('豆包本轮执行超时');

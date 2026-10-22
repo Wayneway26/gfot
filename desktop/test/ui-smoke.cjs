@@ -1,5 +1,5 @@
 // Run separately with Electron on macOS. All model output is synthetic/local.
-const {app,dialog,utilityProcess}=require('electron');
+const {app,dialog,utilityProcess,clipboard}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict');
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gfot-ui-smoke-'));
 const resources=process.env.GFOT_QA_RESOURCES;
@@ -117,11 +117,27 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  await js("document.querySelector('[data-reply=once]').click()");
  await until("document.querySelector('#status').textContent==='等待任务'");
  const afterSwitch=(await api('state')).tasks[0];assert.equal(afterSwitch.id,beforeSwitch.id);assert.equal(afterSwitch.folder,beforeSwitch.folder);assert.ok(afterSwitch.messages.some(m=>m.continuation));assert.equal(afterSwitch.agentId,'doubao');assert.ok(afterSwitch.checkpoint.tools.some(t=>t.output?.includes('synthetic tool result')));assert.ok(afterSwitch.lastTransfer.characters<=60000);assert.equal((await api('state')).projects[0].notes,'Project-wide fixture convention');
+ await chooseAgent('opencode-local');
+ await js("document.querySelector('#prompt').value='GFOT_PROGRESS_UI';document.querySelector('#composer').requestSubmit()");
+ await until("document.querySelector('#execution-status').textContent.includes('正在思考')");
+ assert.ok(!(await js("document.body.innerHTML")).includes('PRIVATE_THOUGHT_FIXTURE'));
+ fs.writeFileSync(path.join(os.tmpdir(),'gfot-thinking.png'),(await win.webContents.capturePage()).toPNG());
+ await until("document.querySelector('#execution-status').textContent.includes('正在查阅项目')");
+ fs.writeFileSync(path.join(os.tmpdir(),'gfot-executing.png'),(await win.webContents.capturePage()).toPNG());
+ await until("document.querySelector('#status').textContent==='等待任务' && document.querySelector('#messages h3')?.textContent==='已完成'");
+ assert.equal(await js("document.querySelector('#messages .turn-process').open"),false);
+ assert.ok(!(await js("document.querySelector('#messages').innerText")).includes('先检查项目结构。'));
+ await js("document.querySelector('#messages [data-copy-code]').click()");await delay(150);assert.equal(await clipboard.readText(),'console.log("done")');
+ assert.ok(await js("!!document.querySelector('.execution-elapsed').dataset.end"));
+ await js("document.querySelector('#toggle-details').click()");
+ assert.equal(await js("document.querySelector('#task-details').hidden"),true);
+ await delay(400);
+ fs.writeFileSync(path.join(os.tmpdir(),'gfot-answer.png'),(await win.webContents.capturePage()).toPNG());
  await js("document.querySelector('#handoff-report > details').open=true");
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-dynamic-switch.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-harness2.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-task.png'),(await win.webContents.capturePage()).toPNG());
- fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','brand SVG assets loaded','840px composer stays within viewport','screenshot']},null,2));
+ fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','brand SVG assets loaded','840px composer stays within viewport','screenshot']},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({ok:false,error:String(error),stack:error.stack}));gateway.close();app.exit(1);}finally{gateway.close();app.quit();}});});
 require(resources?path.join(resources,'app.asar','desktop','main.cjs'):path.join(__dirname,'..','main.cjs'));
 setTimeout(()=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:'120s timeout'}));app.exit(1);},120000).unref();
