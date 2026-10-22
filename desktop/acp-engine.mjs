@@ -12,18 +12,18 @@ export function agentEnvironment(extra={}){
 export class AcpEngine{
  constructor({launch,task,onEvent=()=>{},readOnly=false}){Object.assign(this,{launch,task,onEvent,readOnly});this.requests=new Map();this.permissions=new Map();this.sequence=0;this.buffer='';this.output='';this.stopped=false;this.replaying=false;}
  write(message){if(this.stopped||!this.child?.stdin.writable)throw Error('Agent 连接已关闭');this.child.stdin.write(JSON.stringify({jsonrpc:'2.0',...message})+'\n');}
- request(method,params,timeout=45000){return new Promise((resolve,reject)=>{const id=++this.sequence;const timer=setTimeout(()=>{this.requests.delete(id);reject(Error('Agent 请求超时：'+method));},timeout);this.requests.set(id,{resolve,reject,timer});try{this.write({id,method,params});}catch(e){clearTimeout(timer);this.requests.delete(id);reject(e);}});}
+ request(method,params,timeout=45000){return new Promise((resolve,reject)=>{const id=++this.sequence;const timer=setTimeout(()=>{this.requests.delete(id);reject(Error('Agent 请求超时：'+method));},timeout);this.requests.set(id,{resolve,reject,timer,method});try{this.write({id,method,params});}catch(e){clearTimeout(timer);this.requests.delete(id);reject(e);}});}
  fail(error){for(const r of this.requests.values()){clearTimeout(r.timer);r.reject(error);}this.requests.clear();}
  receive(message){
   if(message.jsonrpc!=='2.0')return;
-  if(!message.method){const r=this.requests.get(message.id);if(!r)return;clearTimeout(r.timer);this.requests.delete(message.id);message.error?r.reject(Error('Agent: '+String(message.error.message||'协议错误').slice(0,1000))):r.resolve(message.result);return;}
+  if(!message.method){const r=this.requests.get(message.id);if(!r)return;if(r.method==='session/prompt')this.nativeTurnFinished=true;clearTimeout(r.timer);this.requests.delete(message.id);message.error?r.reject(Error('Agent: '+String(message.error.message||'协议错误').slice(0,1000))):r.resolve(message.result);return;}
   if(message.method==='session/update'){
    if(this.replaying||message.params?.sessionId!==this.task.sessionId)return;
    const u=message.params.update||{};
    if(u.sessionUpdate==='agent_message_chunk'&&u.content?.type==='text'){
     const text=String(u.content.text||'');if(this.output.length+text.length>200000){this.fail(Error('Agent 输出超过限制'));void this.stop();return;}
     this.output+=text;this.onEvent({type:'message.part.delta',properties:{sessionID:this.task.sessionId,field:'text',delta:text}});
-   }else if(['tool_call','tool_call_update'].includes(u.sessionUpdate))this.onEvent({type:'message.part.updated',properties:{sessionID:this.task.sessionId,part:{type:'tool',id:u.toolCallId,tool:u.title||u.kind||'工具',state:{status:u.status||'pending',input:u.rawInput||{}}}}});
+   }else if(['tool_call','tool_call_update'].includes(u.sessionUpdate))this.onEvent({type:'message.part.updated',properties:{sessionID:this.task.sessionId,part:{type:'tool',id:u.toolCallId,tool:u.title||u.kind||'工具',state:{status:u.status||'pending',...(u.rawInput!==undefined?{input:u.rawInput}:{}),...(u.rawOutput!==undefined?{output:u.rawOutput}:u.content?{output:u.content}:{})}}}});
    return;
   }
   if(message.id===undefined)return;
@@ -55,17 +55,18 @@ export class AcpEngine{
    if(typeof session?.sessionId!=='string'||!session.sessionId)throw Error('Agent 未返回会话 ID');this.task.sessionId=session.sessionId;this.resumed=false;
   }
  }
- async send(text){this.output='';this.turnPromise=this.request('session/prompt',{sessionId:this.task.sessionId,prompt:[{type:'text',text}]},15*60*1000);const result=await this.turnPromise;if(this.cancelling)throw Error('Agent 已停止');if(result.stopReason!=='end_turn'){const nativeError=result._meta?.['codebuddy.ai/errorMessage']||'';if(nativeError.includes('Authentication required'))throw new InputError('此 Agent 的 CLI 尚未登录。请通过其 CLI 完成登录；桌面应用登录不一定与 CLI 共享。');throw Error('Agent 本轮未完成：'+result.stopReason);}return {info:{},parts:[{type:'text',text:this.output}]};}
+ async send(text){this.output='';this.nativeTurnFinished=false;this.turnPromise=this.request('session/prompt',{sessionId:this.task.sessionId,prompt:[{type:'text',text}]},15*60*1000);const result=await this.turnPromise;if(this.cancelling)throw Error('Agent 已停止');if(result.stopReason!=='end_turn'){const nativeError=result._meta?.['codebuddy.ai/errorMessage']||'';if(nativeError.includes('Authentication required'))throw new InputError('此 Agent 的 CLI 尚未登录。请通过其 CLI 完成登录；桌面应用登录不一定与 CLI 共享。');throw Error('Agent 本轮未完成：'+result.stopReason+(nativeError?' · '+String(nativeError).slice(0,800):''));}return {info:{},parts:[{type:'text',text:this.output}]};}
  async history(){return [{info:{id:randomUUID(),role:'assistant',time:{created:Date.now()}},parts:[{type:'text',text:this.output}]}];}
  async permission(id,reply){const p=this.permissions.get(id);if(!p)throw new InputError('审批请求已失效');const choice=p.options.find(o=>o.kind===(reply==='once'?'allow_once':'reject_once'));if(!choice&&reply==='once')throw new InputError('Agent 未提供单次批准选项');this.write({id:p.rpcId,result:{outcome:choice?{outcome:'selected',optionId:choice.optionId}:{outcome:'cancelled'}}});this.permissions.delete(id);}
  async question(){throw new InputError('此 Agent 未提供结构化问题接口');}
  stop(){return this.stopping||=(async()=>{
   this.cancelling=true;
   if(!this.stopped){try{for(const p of this.permissions.values())this.write({id:p.rpcId,result:{outcome:{outcome:'cancelled'}}});if(this.task.sessionId)this.write({method:'session/cancel',params:{sessionId:this.task.sessionId}});}catch{}}
-  if(this.turnPromise)await Promise.race([this.turnPromise.catch(()=>{}),new Promise(r=>setTimeout(r,750))]);
-  this.permissions.clear();this.stopped=true;this.fail(Error('Agent 已停止'));const pid=this.child?.pid;if(!pid)return;
+  if(this.turnPromise)await Promise.race([this.turnPromise.catch(()=>{}),new Promise(r=>setTimeout(r,2500))]);
+  this.cancellationConfirmed=!this.turnPromise||this.nativeTurnFinished===true;this.permissions.clear();this.stopped=true;this.fail(Error('Agent 已停止'));const pid=this.child?.pid;if(!pid)return {confirmed:this.cancellationConfirmed};
   try{process.kill(-pid,'SIGTERM');}catch{}
   await Promise.race([this.exit,new Promise(r=>setTimeout(r,700))]);
   try{process.kill(-pid,'SIGKILL');}catch{}
+  return {confirmed:this.cancellationConfirmed};
  })();}
 }

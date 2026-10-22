@@ -20,3 +20,6 @@ test('oversized ACP frames fail closed rather than retaining unlimited output',a
 test('native Agent environment does not inherit provider tokens or Node injection options',()=>{
  process.env.GFOT_TEST_API_KEY='secret';process.env.NODE_OPTIONS='--trace-warnings';try{const env=agentEnvironment();assert.equal(env.GFOT_TEST_API_KEY,undefined);assert.equal(env.NODE_OPTIONS,undefined);assert.equal(env.HOME,process.env.HOME);}finally{delete process.env.GFOT_TEST_API_KEY;delete process.env.NODE_OPTIONS;}
 });
+test('an owned process exit without native turn acknowledgement is not cancellation confirmation',async()=>{
+ const o=options();o.launch.env.FIXTURE_MODE='unconfirmed';const e=new AcpEngine(o);try{await e.start();const turn=assert.rejects(e.send('wait'),/停止|退出/);await until(()=>e.turnPromise);const outcome=await e.stop();await turn;assert.equal(outcome.confirmed,false);}finally{await e.stop();}
+});

@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-22",
+  "projectContent": "Fixed temporary fixture only",
+  "credentialExport": false,
+  "source": {
+    "agent": "opencode-local",
+    "status": "idle",
+    "checkpoint": true,
+    "tools": 3,
+    "unconfirmed": false
+  },
+  "target": {
+    "agent": "doubao",
+    "status": "idle",
+    "sameTask": true,
+    "sameFolder": true,
+    "continuationRecorded": true,
+    "contextPrepared": 6059,
+    "outputVerified": true
+  }
+}

@@ -52,3 +52,13 @@ The source and final packaged Electron workflows passed with a synthetic Doubao 
 Separately, authorized live Doubao 2.32.5 diagnostics passed fixed inference, selected temporary-project file read/write, a two-turn adapter run with same-conversation continuation, and native waiting_input cancellation confirmed by exact run ID. No repository content or credentials were exported. These are narrow diagnostics, not a broad coding benchmark or proof that native interactive approval forwarding works. WorkBuddy inference still requires completing CLI login; Qianwen has no enabled execution adapter.
 
 Standards and Spec reviews identified timeout and cancellation races; the final targeted follow-up confirmed the fixes, with regression tests. The macOS arm64 build remains unsigned/unnotarized.
+
+## Dynamic task continuation — 2026-10-22
+
+gfot 0.7.0-h2.1 passed syntax checks and **121 automated tests**, zero failures/skips. New coverage exercises canonical project notes, bounded shared checkpoints, visible tool results, large-history omission with the original goal retained, allowance errors, active-turn cancellation before target launch, global capacity reservations, unusable target accounts, shutdown during observation/body reads, unacknowledged native cancellation and interrupted restart recovery.
+
+The source Electron workflow passed with synthetic Agent transports and real bundled OpenCode/Harness² using local synthetic models. It groups a project, edits shared project memory, encounters a native allowance signal, then switches and continues the same task with preserved identity/folder, tool evidence and visible context counts. The final packaged workflow also passed: [packaged UI report](dynamic-switch-ui-check.json), [Electron capture with synthetic services](dynamic-switching-preview.png).
+
+A separate authorized native diagnostic used the actual installed OpenCode and Doubao, with fixed files in a new temporary project. OpenCode inspected the input and saved tool evidence; a switch-and-continue operation handed the same task/project to Doubao, which created the expected output file and passed a read-back check. No repository content or credentials were exported. See [native diagnostic](dynamic-native-diagnostic.json). This is not a real Codex-quota exhaustion or WorkBuddy-login validation.
+
+The [two-axis review](dynamic-switching-review.md) identified and verified the lifecycle, preflight and evidence fixes. Builds remain unsigned macOS arm64 builds. Uniform native quota queries, automatic provider failover, private reasoning/cache migration and a Qianwen executor are not claimed.

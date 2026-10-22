@@ -21,9 +21,9 @@ CLI paths and launch arguments are fixed in `desktop/local-agents.mjs`. Renderer
 
 ## Switching and shared context
 
-Use **执行 Agent** in a task. Finish or stop the current turn before switching. Each task saves separate native session IDs for each executor. A return to an Agent resumes that Agent's own session when supported.
+Use **执行 Agent** in a task. Use **切换并继续** to request stopping and checkpointing the current turn before the next executor starts. Unconfirmed native work blocks handoff. Each task saves separate native session IDs for each executor. A return to an Agent resumes that Agent's own session when supported.
 
-gfot retains the visible user/assistant conversation. On first use or return, it forwards messages not yet synchronized to the target executor, up to 60,000 characters, plus editable task notes (8,000 characters maximum). Earlier omitted messages are counted in the execution timeline. Update **任务记忆** for requirements that must remain available. This does not merge private reasoning or import another app's chat history.
+gfot retains the visible user/assistant conversation. On first use or return, it forwards bounded unsynchronized messages together with project notes, task notes and execution checkpoints. The combined normal-turn input budget is 60,000 characters. Project and task notes each allow 8,000 characters. Earlier omitted messages are counted in the execution timeline. Update **项目记忆** and **任务记忆** for requirements that must remain available. See [dynamic switching](dynamic-switching.md). This does not merge private reasoning or import another app's chat history.
 
 Sessions can fail to resume after native data removal or an incompatible app update. gfot reports the failure rather than silently creating a replacement. A CLI that does not advertise loadSession receives a fresh session and visible-history continuation.
 

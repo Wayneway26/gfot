@@ -170,3 +170,18 @@ dialog .actions { display: flex; justify-content: flex-end; gap: 9px; margin-top
 .settings-heading { display: flex; align-items: center; justify-content: space-between; position: sticky; top: -28px; background: white; z-index: 2; padding: 10px 0; }
 .settings-heading h2 { margin: 0; }
 #settings-dismiss { border: 0; font-size: 20px; line-height: 1; padding: 7px 10px; }
+
+.project-group { margin-bottom: 12px; }
+.project-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; background:transparent; border:0; padding:9px 8px; color:#52627d; font-size:12px; text-align:left; }
+.project-toggle span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.project-toggle small { color:#8a96aa; padding-left:8px; }
+.project-group .task-item { padding-left:21px; }
+#resume-banner { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:12px 0; padding:12px; border-left:3px solid var(--cyan); background:#f4f8ff; font-size:12px; }
+#resume-banner[hidden] { display:none; }
+#resume-banner button { margin-left:auto; color:#2459d8; }
+.agent-toolbar { flex-wrap:wrap; }
+.checkpoint { border-bottom:1px solid #e3eaf4; padding:0 0 16px; margin-bottom:20px; color:#596a83; font-size:11px; }
+.checkpoint summary { cursor:pointer; color:#304362; font-size:12px; }
+.checkpoint small { color:#8692a6; padding-left:6px; }
+.checkpoint pre { max-height:180px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
+.switch-project { font-size:12px; overflow-wrap:anywhere; color:#72819a; }

@@ -1,5 +1,6 @@
 import {randomUUID,randomBytes,createCipheriv,createDecipheriv} from 'node:crypto';
 import {readFileSync,writeFileSync,renameSync,mkdirSync} from 'node:fs';
+import {ensureProject} from './task-context.mjs';
 import {join,isAbsolute} from 'node:path';
 export class InputError extends Error {}
 export const requireText=(value,name,max=30000)=>{if(typeof value!=='string'||!value.trim()||value.length>max)throw new InputError(`请填写${name}`);return value.trim();};
@@ -25,8 +26,9 @@ export function vault(key){
 export function createStore(dir){
  mkdirSync(dir,{recursive:true,mode:0o700});const path=join(dir,'desktop.json');let state;
  try{state=JSON.parse(readFileSync(path,'utf8'));if(state.version!==1||!Array.isArray(state.tasks)||!Array.isArray(state.profiles))throw Error('Unsupported data');}catch(e){if(e.code!=='ENOENT')throw e;state={version:1,profiles:[],tasks:[]};}
- for(const task of state.tasks){task.agentId||='opencode';task.contextNotes||='';task.agentSessions||=task.sessionId?{[task.agentId]:{sessionId:task.sessionId,cursor:task.messages.length}}:{};}
- for(const task of state.tasks)if(['running','starting','permission'].includes(task.status)){task.status='interrupted';if(task.harnessRun?.status==='running')task.harnessRun.status='interrupted';task.pending=[];task.error='上次执行被中断。核对文件和执行记录后再继续。';}
+ state.projects||=[];
+ for(const task of state.tasks){task.projectId=ensureProject(state,task.folder).id;task.toolHistory||=[];task.agentId||='opencode';task.contextNotes||='';task.agentSessions||=task.sessionId?{[task.agentId]:{sessionId:task.sessionId,cursor:task.messages.length}}:{};}
+ for(const task of state.tasks)if((task.transition||['running','starting','permission'].includes(task.status))){if(['running','starting','permission'].includes(task.status)&&(task.executorKind==='acp'||['opencode-local','workbuddy','workbuddy-ai'].includes(task.agentId)))task.executionUnconfirmed={agentId:task.agentId,at:new Date().toISOString()};task.status='interrupted';if(task.draft?.trim()){task.messages.push({id:randomUUID(),role:'assistant',agentId:task.agentId,text:task.draft,interrupted:true,at:new Date().toISOString()});task.draft='';}if(task.harnessRun?.status==='running')task.harnessRun.status='interrupted';delete task.transition;task.pending=[];task.error='上次执行被中断。核对文件和执行记录后再继续。';}
  function save(){writeFileSync(path+'.tmp',JSON.stringify(state,null,2),{mode:0o600});renameSync(path+'.tmp',path);}
  save();return {state,save};
 }

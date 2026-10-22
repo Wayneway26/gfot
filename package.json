@@ -1,12 +1,12 @@
 {
   "name": "gfot",
-  "version": "0.6.0-h2.2",
+  "version": "0.7.0-h2.1",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test test/*.test.mjs desktop/test/*.test.mjs",
-    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js && node --check review-snapshot.mjs && node --check scripts/isolated-check.mjs && node --check workbuddy-bridge.mjs && node --check bridge-tools.mjs && node --check scripts/workbuddy-mcp.mjs && node --check public/workbuddy.js && node --check handoff.mjs && node --check handoff-tools.mjs && node --check public/handoff.js && node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/worker.mjs && node --check desktop/backend.mjs && node --check desktop/engine.mjs && node --check desktop/ui/app.js && node --check desktop/connections.mjs && node --check desktop/accounts.mjs && node --check desktop/chatgpt-oauth.mjs && node --check desktop/account-proxy.mjs && node --check desktop/harness2.mjs && node --check scripts/build-brand.cjs && node --check desktop/local-agents.mjs && node --check desktop/acp-engine.mjs && node --check desktop/doubao-engine.mjs",
+    "check": "node --check server.mjs && node --check domain.mjs && node --check review-bundle.mjs && node --check public/app.js && node --check public/review-policy.js && node --check public/review-export.js && node --check review-snapshot.mjs && node --check scripts/isolated-check.mjs && node --check workbuddy-bridge.mjs && node --check bridge-tools.mjs && node --check scripts/workbuddy-mcp.mjs && node --check public/workbuddy.js && node --check handoff.mjs && node --check handoff-tools.mjs && node --check public/handoff.js && node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/worker.mjs && node --check desktop/backend.mjs && node --check desktop/engine.mjs && node --check desktop/ui/app.js && node --check desktop/connections.mjs && node --check desktop/accounts.mjs && node --check desktop/chatgpt-oauth.mjs && node --check desktop/account-proxy.mjs && node --check desktop/harness2.mjs && node --check scripts/build-brand.cjs && node --check desktop/local-agents.mjs && node --check desktop/acp-engine.mjs && node --check desktop/doubao-engine.mjs && node --check desktop/task-context.mjs",
     "desktop": "electron desktop/main.cjs",
     "dist:mac": "electron-builder --config desktop/builder.cjs --mac zip --arm64",
     "test:desktop": "node --test desktop/test/*.test.mjs",
