@@ -1,0 +1,34 @@
+[
+  {
+    "id": "opencode-local",
+    "status": 200,
+    "body": {
+      "ok": true,
+      "note": "协议与会话创建通过，尚未调用模型。首次任务仍需验证账号与额度。"
+    }
+  },
+  {
+    "id": "workbuddy",
+    "status": 200,
+    "body": {
+      "ok": true,
+      "note": "协议与会话创建通过，尚未调用模型。首次任务仍需验证账号与额度。"
+    }
+  },
+  {
+    "id": "workbuddy-ai",
+    "status": 200,
+    "body": {
+      "ok": true,
+      "note": "协议与会话创建通过，尚未调用模型。首次任务仍需验证账号与额度。"
+    }
+  },
+  {
+    "id": "doubao",
+    "status": 200,
+    "body": {
+      "ok": true,
+      "note": "协议与会话创建通过，尚未调用模型。首次任务仍需验证账号与额度。"
+    }
+  }
+]

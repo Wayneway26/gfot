@@ -1,0 +1,50 @@
+{
+  "repository": "https://github.com/Fullstop000/doubao-cli",
+  "commit": "6d7b1c66430db3bbc095a3d9c1cf15c7ce81f8e6",
+  "version": "0.20.0",
+  "license": "MIT",
+  "scope": "Desktop automation import closure. Headless login and credential readers are not invoked.",
+  "patches": {
+    "src/automation.mjs": "Expose optional receipt callback with conversation/run IDs after upstream checkpoint persistence."
+  },
+  "upstreamFiles": {
+    "LICENSE": "263a7bd97a040133e9aae1008fd981360a310a7ce3e472530c22fa8a590f5cbf",
+    "package.json": "e67a75e36e2c013dc1f0cb3aef6609fcf91d3e98a3a69b2d4ee4e66d2dd5da4e",
+    "src/app-modules.mjs": "5e80b4d2f1f30e17e12eea85543d5e1dd9612ea08dad0a80201971b3e28c41be",
+    "src/app.mjs": "c058d6baf4f5196a75e18f421228b37c46546827255161fb84c2483442e0e340",
+    "src/attachments.mjs": "435d7be93c72b4c80f39aaf061f4d37c38525b12cb207b37f9485acfa9f98974",
+    "src/automation.mjs": "8454aa895ea45c73fa74b574aa5841d13de63fde97c13e97cc3563f9def33b8c",
+    "src/cdp.mjs": "d56cb28e3c4c0bd7a67def2f579018cc3d4268697526920f0c93ec7d7667e878",
+    "src/config.mjs": "772f476015f5d24432547f17b87856d48f7d679561a2295902748ce938d3c8d4",
+    "src/connection-badge.mjs": "bedbb3032f5b5978e29be46811f9ede96fa4428ce2b0a3516278558dcca09139",
+    "src/context.mjs": "3d3d48681d432d6818d3a7190d88706ac51c1064544b7f31c20d09bb04caeeab",
+    "src/features.mjs": "256bd62d6721bc61d0d0ba03641e8257b61b533a3136913551a7b621f3c69a5e",
+    "src/mcp.mjs": "74a93e940f6c2cdf4c5e85d46766c67138fda8519b3251cff4f71c05c6464a6b",
+    "src/models.mjs": "4e82a428c4f39f02f2b6a9550552279926cf1a04bad661bfdd11a09ae925022d",
+    "src/permissions.mjs": "58faecd6d4574d2d82f98f83de7da4541a2c6985b1caa229955105b449f2834b",
+    "src/protocol.mjs": "ae97ae049dfdfb138acbb7eb20f0178bc512d76e44d9246d995d48aba6a2cee0",
+    "src/sessions.mjs": "8ba05670107886c8dea14eaf31dabc4a7935038ef9eb7179adc7b2576c3eaa52",
+    "src/storage.mjs": "0b841e593633deeb52d0bb83897c4cf4112dd09c45b56bece58936550d62ed08",
+    "src/turns.mjs": "39bb083c4b9691cbd3b4235e3b23a368b5df6a3b9416161bf57cd67fdc2c302c"
+  },
+  "files": {
+    "LICENSE": "263a7bd97a040133e9aae1008fd981360a310a7ce3e472530c22fa8a590f5cbf",
+    "package.json": "e67a75e36e2c013dc1f0cb3aef6609fcf91d3e98a3a69b2d4ee4e66d2dd5da4e",
+    "src/app-modules.mjs": "5e80b4d2f1f30e17e12eea85543d5e1dd9612ea08dad0a80201971b3e28c41be",
+    "src/app.mjs": "c058d6baf4f5196a75e18f421228b37c46546827255161fb84c2483442e0e340",
+    "src/attachments.mjs": "435d7be93c72b4c80f39aaf061f4d37c38525b12cb207b37f9485acfa9f98974",
+    "src/automation.mjs": "1bed1ebe0d627e0746b7fbec9ce555d2e07173a05696930b7b615f4cef00020e",
+    "src/cdp.mjs": "d56cb28e3c4c0bd7a67def2f579018cc3d4268697526920f0c93ec7d7667e878",
+    "src/config.mjs": "772f476015f5d24432547f17b87856d48f7d679561a2295902748ce938d3c8d4",
+    "src/connection-badge.mjs": "bedbb3032f5b5978e29be46811f9ede96fa4428ce2b0a3516278558dcca09139",
+    "src/context.mjs": "3d3d48681d432d6818d3a7190d88706ac51c1064544b7f31c20d09bb04caeeab",
+    "src/features.mjs": "256bd62d6721bc61d0d0ba03641e8257b61b533a3136913551a7b621f3c69a5e",
+    "src/mcp.mjs": "74a93e940f6c2cdf4c5e85d46766c67138fda8519b3251cff4f71c05c6464a6b",
+    "src/models.mjs": "4e82a428c4f39f02f2b6a9550552279926cf1a04bad661bfdd11a09ae925022d",
+    "src/permissions.mjs": "58faecd6d4574d2d82f98f83de7da4541a2c6985b1caa229955105b449f2834b",
+    "src/protocol.mjs": "ae97ae049dfdfb138acbb7eb20f0178bc512d76e44d9246d995d48aba6a2cee0",
+    "src/sessions.mjs": "8ba05670107886c8dea14eaf31dabc4a7935038ef9eb7179adc7b2576c3eaa52",
+    "src/storage.mjs": "0b841e593633deeb52d0bb83897c4cf4112dd09c45b56bece58936550d62ed08",
+    "src/turns.mjs": "39bb083c4b9691cbd3b4235e3b23a368b5df6a3b9416161bf57cd67fdc2c302c"
+  }
+}

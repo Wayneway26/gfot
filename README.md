@@ -25,7 +25,7 @@ Local Agent execution, shared task context and your own accounts.
 gfot is a desktop client for managing AI coding tasks in local projects. Keep project folders, conversations, execution history and account connections together, and continue a task with a different executor, model or account between turns.
 
 - **Project-based tasks.** Select a local folder and keep conversations and execution records with the task.
-- **Local Agent execution.** Select bundled OpenCode or an installed OpenCode, WorkBuddy or WorkBuddy AI CLI through ACP. Native CLI authentication is required.
+- **Local Agent execution.** Select bundled OpenCode or an installed OpenCode, WorkBuddy or WorkBuddy AI CLI through ACP. An experimental native Doubao desktop adapter is also available. Each local executor uses its own authentication and quota.
 - **Your own accounts.** Import an existing Codex login or configure an API, local model service or compatible proxy.
 - **Shared task context.** Keep per-Agent sessions, visible conversation history and editable task notes when switching executors.
 - **Execution controls.** Follow streaming output and tool activity; approve file edits, commands and access outside the project.
@@ -88,7 +88,7 @@ The `.app` and ZIP are written to `dist/`. Preview builds are unsigned and have 
 | **Execution adapters · HTTP / ACP** | Bundled OpenCode and installed Agent CLIs: Agent Loop, tools, sessions and permission events. |
 | **Harness² · Python adapter** | Optional probe, proposal and composition workflow for task-level instruction configurations. |
 
-The execution selector switches the Agent runtime; the model selector configures bundled OpenCode. 豆包工作 and 千问办公 are detected but remain unavailable for automatic execution. [Adapter support and validation](docs/local-agents.md).
+The execution selector switches the Agent runtime; the model selector configures bundled OpenCode. Doubao desktop has an experimental native adapter with per-turn authorization; native interactive confirmations are not yet supported. 千问办公 remains detection-only. [Adapter support and validation](docs/local-agents.md).
 
 Credentials are encrypted locally with a master key protected by macOS Keychain. Conversations and execution records are stored locally; configured providers receive the context needed for model requests. Tool approvals are application controls, not an OS sandbox.
 

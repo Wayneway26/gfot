@@ -6,7 +6,7 @@ test('local Agent discovery distinguishes installed UI from a callable executor 
  const dir=mkdtempSync(join(tmpdir(),'gfot-discovery-'));try{
   mkdirSync(join(dir,'WorkBuddy.app/Contents/Resources/app.asar.unpacked/cli/bin'),{recursive:true});writeFileSync(join(dir,'WorkBuddy.app/Contents/Resources/app.asar.unpacked/cli/bin/codebuddy'),'fixture');mkdirSync(join(dir,'Doubao.app'));
   const r=createAgentRegistry({appRoots:[dir],bundledBinary:'/fixture/opencode'}),list=r.list();
-  assert.equal(list.find(a=>a.id==='workbuddy').available,true);assert.equal(list.find(a=>a.id==='doubao').kind,'unavailable');assert.equal(list.find(a=>a.id==='qianwen').installed,false);
+  assert.equal(list.find(a=>a.id==='workbuddy').available,true);assert.equal(list.find(a=>a.id==='doubao').kind,'doubao');assert.equal(list.find(a=>a.id==='qianwen').installed,false);
   assert.ok(!JSON.stringify(list).includes(dir));assert.throws(()=>r.command('doubao'));assert.throws(()=>r.command('unknown'));
   const c=r.command('workbuddy');assert.ok(c.args.includes('--acp'));assert.ok(c.args.includes('--serve'));assert.ok(!c.args.includes('--dangerously-skip-permissions'));assert.ok(c.env.CODEBUDDY_CONFIG_DIR.endsWith('.workbuddy'));
  }finally{rmSync(dir,{recursive:true,force:true});}

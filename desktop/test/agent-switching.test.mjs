@@ -63,3 +63,16 @@ test('stopping preserves redacted partial output so the next Agent can continue 
   const p=(await call('profiles',{label:'Synthetic',baseURL:'http://localhost:1234/v1',model:'x'})).profiles[0];await call('tasks/'+taskId+'/agent',{agentId:'opencode'});await call('tasks/'+taskId+'/prompt',{text:'continue',profileId:p.id});await wait(()=>service.state.tasks[0].status==='idle');assert.ok(seen[0].includes('Completed part A'));assert.ok(seen[0].includes('interrupted'));
  }finally{await service?.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test('Doubao checkpoints native receipt and blocks Agent switching when cancellation is unconfirmed',async()=>{
+ const {DoubaoEngine}=await import('../doubao-engine.mjs');const dir=mkdtempSync(join(tmpdir(),'gfot-doubao-backend-'));let service;
+ const nativeRegistry={...registry,list:()=>[...list,{id:'doubao',kind:'doubao',available:true}],get:id=>id==='doubao'?{id,kind:'doubao',available:true}:registry.get(id)};
+ const sdk={check:async()=>true,identity:async()=>'native-account',create:async(_text,o)=>{const r={conversationId:'123456789012',runId:'123456789013'};o.onReceipt(r);return r;},status:async()=>({status:'waiting_input'}),stop:async()=>({stopped:false})};
+ const call=async(route,body)=>fetch(service.url+'/api/'+route,{method:'POST',headers:{authorization:'Bearer '+service.auth,'content-type':'application/json'},body:JSON.stringify(body)});
+ try{service=await startDesktopServer({dataDir:dir,key:randomBytes(32),agentRegistry:nativeRegistry,doubaoFactory:o=>new DoubaoEngine({...o,sdk,pollMs:1})});const {taskId}=await (await call('tasks',{folder:dir,agentId:'doubao'})).json();const task=service.state.tasks[0];
+  await call('tasks/'+taskId+'/prompt',{text:'local fixture'});await wait(()=>task.status==='permission');assert.equal(task.agentSessions.doubao.sessionId,null);
+  await call('tasks/'+taskId+'/permission',{id:task.pending[0].id,reply:'once'});await wait(()=>task.status==='error');
+  assert.match(task.error,/尚未确认/);assert.equal(JSON.parse(task.agentSessions.doubao.sessionId).runId,'123456789013');assert.equal(JSON.parse(task.agentSessions.doubao.sessionId).pending,true);
+  const change=await call('tasks/'+taskId+'/agent',{agentId:'opencode'});assert.equal(change.status,400);
+ }finally{await service?.close();rmSync(dir,{recursive:true,force:true});}
+});

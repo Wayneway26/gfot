@@ -17,6 +17,19 @@
       "id": "workbuddy-ai",
       "inference": false,
       "error": "此 Agent 的 CLI 尚未登录。请通过其 CLI 完成登录；桌面应用登录不一定与 CLI 共享。"
+    },
+    {
+      "id": "doubao",
+      "version": "2.32.5",
+      "transport": "loopback CDP, 127.0.0.1:9225",
+      "connected": true,
+      "inference": true,
+      "temporaryWorkspaceRead": true,
+      "temporaryWorkspaceWrite": true,
+      "adapterSameSessionContinuation": true,
+      "exactRunCancellationConfirmed": true,
+      "nativePerToolApprovalForwarding": false,
+      "credentialExport": false
     }
   ]
 }

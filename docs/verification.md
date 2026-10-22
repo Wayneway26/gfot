@@ -23,7 +23,7 @@ Existing tests exercise authenticated desktop APIs, encrypted/redacted credentia
 
 ## Real-provider scope
 
-The earlier explicitly authorized Codex-import diagnostic passed model discovery, Responses inference and function-result return with one real account. That diagnostic predates this Harness² integration. No real account or paid model was used for this branch's tests. Model quality improvement, real-provider multi-stage optimization, browser OAuth, quota responses, real cross-account execution, other Agent runtimes and Harness² cross-task reflection/library are not verified.
+The earlier explicitly authorized Codex-import diagnostic passed model discovery, Responses inference and function-result return with one real account. That diagnostic predates this Harness² integration. The initial Harness² validation used synthetic models, without real accounts or paid model calls. Model quality improvement, real-provider multi-stage optimization, browser OAuth, quota responses, real cross-account execution, other Agent runtimes and Harness² cross-task reflection/library were not verified in that initial validation.
 
 Python 3.12/3.13 is an external requirement for optimization, not bundled. Snapshot copies and tool approvals are not an OS sandbox. Automated native file selection uses a simulated dialog, while preload/main IPC, file parsing and encrypted storage are real. Builds remain unsigned/unnotarized; Intel Mac is not validated.
 
@@ -39,6 +39,16 @@ gfot 0.5.0-h2.2 applies the cobalt/cyan vector identity to the README, desktop U
 
 ## Local Agent adapters — 2026-10-21
 
-gfot 0.6.0-h2.1: syntax checks passed, 93 automated tests passed with zero failures/skips. New tests cover ACP transport/permissions/cancellation/output limits, per-executor session restoration, shared task notes and native login cancellation. The source Electron workflow passed with a synthetic installed ACP Agent, real bundled OpenCode and real Harness²; it switches executors, approves a native tool request, preserves canonical messages and adopts an inspectable optimized prompt.
+gfot 0.6.0-h2.1: syntax checks passed, 95 automated tests passed with zero failures/skips. New tests cover ACP transport/permissions/cancellation/output limits, per-executor session restoration, shared task notes and native login cancellation. The source Electron workflow passed with a synthetic installed ACP Agent, real bundled OpenCode and real Harness²; it switches executors, approves a native tool request, preserves canonical messages and adopts an inspectable optimized prompt.
 
 Real installed OpenCode 2.1.1 passed ACP initialization, session creation and a fixed no-project inference. WorkBuddy 5.8.3 and WorkBuddy AI 5.8.4 passed initialization/session creation; fixed inference reported authentication required, including after selecting their native config directories. These two real inference paths are not validated as usable until CLI login. No native credentials were extracted into gfot. 豆包/千问 remain unavailable for automatic execution. See [adapter details](local-agents.md).
+
+## Doubao desktop adapter — 2026-10-22
+
+gfot 0.6.0-h2.2: the final full suite passed **107 tests**, zero failures/skips. Eleven Doubao tests cover explicit native-turn grants, denied/stopped submissions, receipt checkpointing, unknown acceptance without replay, account changes, exact cancellation, late receipts, stalled CDP observers and vendored patch integrity. Backend coverage rejects switching away from unconfirmed native work.
+
+The source and final packaged Electron workflows passed with a synthetic Doubao transport, real bundled OpenCode and real Harness². They exercise Agent switching, the visible native-turn authorization boundary, canonical task history and prompt adoption. The final packaged worker also connected to the installed OpenCode, WorkBuddy, WorkBuddy AI and Doubao interfaces without inference. See [UI report](local-agents-ui-check.json) and [packaged native checks](packaged-native-agent-check.json).
+
+Separately, authorized live Doubao 2.32.5 diagnostics passed fixed inference, selected temporary-project file read/write, a two-turn adapter run with same-conversation continuation, and native waiting_input cancellation confirmed by exact run ID. No repository content or credentials were exported. These are narrow diagnostics, not a broad coding benchmark or proof that native interactive approval forwarding works. WorkBuddy inference still requires completing CLI login; Qianwen has no enabled execution adapter.
+
+Standards and Spec reviews identified timeout and cancellation races; the final targeted follow-up confirmed the fixes, with regression tests. The macOS arm64 build remains unsigned/unnotarized.

@@ -1,0 +1,45 @@
+{
+  "name": "doubao-cli",
+  "version": "0.20.0",
+  "description": "Doubao CLI with Linux/macOS headless HTTP and macOS desktop backends",
+  "author": "Fullstop000 <fullstop1005@gmail.com>",
+  "type": "module",
+  "bin": {
+    "doubao": "bin/doubao.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs/headless.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:e2e": "node scripts/e2e.mjs",
+    "test:e2e:headless": "node scripts/headless-e2e.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fullstop000/doubao-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Fullstop000/doubao-cli/issues"
+  },
+  "homepage": "https://github.com/Fullstop000/doubao-cli#readme",
+  "keywords": [
+    "doubao",
+    "cli",
+    "macos",
+    "linux",
+    "headless",
+    "automation",
+    "cdp"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
