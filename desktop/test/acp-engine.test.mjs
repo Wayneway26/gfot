@@ -12,7 +12,7 @@ test('ACP resumes its own session without replaying old output into the active r
  const o=options();o.task.sessionId='saved-id';const e=new AcpEngine({...o,readOnly:true});try{await e.start();assert.equal(e.resumed,true);assert.equal(e.task.sessionId,'saved-id');await e.send('readonly');assert.equal(e.output,'你好 denied');}finally{await e.stop();}
 });
 test('cancelling a pending ACP turn resolves outstanding permissions and stops the group',async()=>{
- const e=new AcpEngine(options());try{await e.start();const p=e.send('wait');const rejection=assert.rejects(p,/停止|cancelled|退出/);await until(()=>e.permissions.size===1);const pid=e.child.pid;await e.stop();await rejection;assert.equal(e.requests.size,0);assert.equal(e.permissions.size,0);assert.throws(()=>process.kill(-pid,0));}finally{await e.stop();}
+ const e=new AcpEngine(options());try{await e.start();const p=e.send('wait');const rejection=assert.rejects(p,/停止|cancelled|退出/);await until(()=>e.permissions.size===1);const pid=e.child.pid;await e.stop();await rejection;assert.equal(e.requests.size,0);assert.equal(e.permissions.size,0);assert.throws(()=>process.kill(-pid,0));assert.equal((await e.stop()).confirmed,true);}finally{await e.stop();}
 });
 test('oversized ACP frames fail closed rather than retaining unlimited output',async()=>{
  const o=options();o.launch.env.FIXTURE_MODE='oversize';const e=new AcpEngine(o);try{await e.start();await assert.rejects(e.send('oversize'),/过大|停止/);}finally{await e.stop();}

@@ -34,8 +34,10 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
  const view=()=>({...publicState(state),agents:agents.list().map(a=>({...a,check:state.agentChecks?.[a.id],login:[...nativeLogins.values()].find(l=>l.agentId===a.id)?.public})),engine:{name:'OpenCode',bundled:!!binary,version:'1.19.3'},harness2:{integrated:true,...harnessStatus(harnessRunner)},capabilities:{agentSwitching:true,sharedProjectContext:true,dynamicContinuation:true,automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
  function changed(){if(closed)return;for(const client of clients)client.write('event: state\ndata: '+JSON.stringify(view())+'\n\n');clearTimeout(timer);timer=setTimeout(storage.save,80);}
  function addEvent(task,event){task.events.push({...event,at:new Date().toISOString()});task.events=task.events.slice(-150);changed();}
- function onEvent(task,event){
-  const raw=event.properties||{};if(!active.get(task.id)?.harness2&&raw.sessionID&&task.sessionId&&raw.sessionID!==task.sessionId)return;
+ function onEvent(task,event,runtime){
+  if(active.get(task.id)!==runtime||runtime.cancelled||runtime.eventsClosed)return;
+  const raw=event.properties||{};
+  if(!runtime.harness2&&task.sessionId&&[raw.sessionID,raw.part?.sessionID].some(id=>id&&id!==task.sessionId))return;
   const properties=safe(raw);for(const field of ['id','sessionID'])if(raw[field]!==undefined)properties[field]=raw[field];
   if(properties.part)for(const field of ['id','messageID','sessionID'])if(raw.part[field]!==undefined)properties.part[field]=raw.part[field];
   const boundary=()=>{const runtime=active.get(task.id);if(!runtime)return;if(task.draft?.trim())task.liveProgress=[...(task.liveProgress||[]),task.draft].slice(-20).map(t=>t.slice(-5000));runtime.rawDraft='';task.draft='';storage.save();};
@@ -72,7 +74,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    const wasFresh=!engineTask.sessionId;
    if(agent.kind==='builtin'&&profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
-   const engine=runtime.engine=agent.kind==='builtin'?engineFactory({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event)}):agent.kind==='doubao'?doubaoFactory({root:doubaoRoot,task:engineTask,onEvent:event=>onEvent(task,event),onSession:sessionId=>{task.sessionId=sessionId;slots[agent.id]={sessionId,cursor:saved.cursor||0};storage.save();}}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event)});
+   const engine=runtime.engine=agent.kind==='builtin'?engineFactory({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event,runtime)}):agent.kind==='doubao'?doubaoFactory({root:doubaoRoot,task:engineTask,onEvent:event=>onEvent(task,event,runtime),onSession:sessionId=>{task.sessionId=sessionId;slots[agent.id]={sessionId,cursor:saved.cursor||0};storage.save();}}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event,runtime)});
    await engine.start();
    slots[agent.id]={sessionId:engineTask.sessionId,cursor:wasFresh||engine.resumed===false?0:saved.cursor||0};
    task.sessionId=engineTask.sessionId;storage.save();if(runtime.cancelled)return;
@@ -93,13 +95,20 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
     const answerText=(m.parts||[]).filter(p=>p.type==='text').map(p=>p.text||'').join('\n');
     if(answerText){task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:answerText,presentation:m.info.presentation||(!answer?.info?.error&&index===answers.length-1?'final':'progress'),at:new Date(m.info.time?.created||Date.now()).toISOString()});outputRecorded=true;}
    }
+   if(!outputRecorded){
+    // Some native adapters stream public text without returning it in history.
+    const progress=task.liveProgress||[],streamed=[...progress,...(task.draft?.trim()?[task.draft]:[])];
+    for(const [index,text] of streamed.entries())if(text.trim()){
+     task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text,presentation:!answer?.info?.error&&index>=progress.length?'final':'progress',at:new Date().toISOString()});outputRecorded=true;
+    }
+   }
    slots[agent.id]={sessionId:engineTask.sessionId,cursor:task.messages.length};
    if(agent.kind!=='builtin'){state.agentChecks||={};state.agentChecks[agent.id]={at:new Date().toISOString(),connected:true,inference:true};}
    if(outputRecorded){task.liveProgress=[];task.draft='';runtime.rawDraft='';}
    if(answer?.info?.error)throw Error(JSON.stringify(answer.info.error));
    task.blocked=null;task.error=null;addEvent(task,{type:'done',text:'本轮执行已结束，请检查实际变更与验证结果。'});
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);task.blocked={kind:classifyFailure(task.error),agentId:agent.id,at:new Date().toISOString()};addEvent(task,{type:'error',text:task.error});}}
-  finally{clearTimeout(deadline);let stopFailed=false;try{await stopExecutor(runtime,task);}catch(error){stopFailed=true;task.error=safe(error.message);addEvent(task,{type:'error',text:task.error});}grant?.revoke();if(!outputRecorded&&(runtime.cancelled||finalStatus==='error')){const partial=[...(task.liveProgress||[]),task.draft].filter(Boolean).join('\n\n').slice(-100000);if(partial.trim())task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:partial,presentation:'progress',interrupted:true,at:new Date().toISOString()});}const finishedStatus=stopFailed?'error':runtime.cancelled?'stopped':finalStatus;task.pending=[];task.liveProgress=[];task.draft='';const workspace=await workspaceObserver(task.folder);task.status=finishedStatus;finishExecution(task,finishedStatus);task.checkpoint=checkpoint(task,workspace);active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();runtime.finish();}
+  finally{runtime.eventsClosed=true;clearTimeout(deadline);let stopFailed=false;try{await stopExecutor(runtime,task);}catch(error){stopFailed=true;task.error=safe(error.message);addEvent(task,{type:'error',text:task.error});}grant?.revoke();if(!outputRecorded&&(runtime.cancelled||finalStatus==='error')){const partial=[...(task.liveProgress||[]),task.draft].filter(Boolean).join('\n\n').slice(-100000);if(partial.trim())task.messages.push({id:randomUUID(),role:'assistant',agentId:agent.id,text:partial,presentation:'progress',interrupted:true,at:new Date().toISOString()});}const finishedStatus=stopFailed?'error':runtime.cancelled?'stopped':finalStatus;task.pending=[];task.liveProgress=[];task.draft='';const workspace=await workspaceObserver(task.folder);task.status=finishedStatus;finishExecution(task,finishedStatus);task.checkpoint=checkpoint(task,workspace);active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();runtime.finish();}
  }
  async function runHarness(task,text,profile){
   beginExecution(task);const runtime={engine:null,cancelled:false,harness2:true};let grant,finalStatus='idle';active.set(task.id,runtime);
@@ -109,13 +118,13 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    if(profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
    const engine=runtime.engine=new Harness2Engine({binary,dataDir,harnessRunner,task,prompt:text,profile:resolved,key:grant?.key||secrets.open(profile.secret),engineFactory,redact:safe,
-    onEvent:event=>onEvent(task,event),onPhase:phase=>{task.pending=[];task.liveProgress=[];task.draft='';task.status='running';executionPhase(task,'working','提示词优化 · '+phase.label);task.harnessRun.phases.push(phase);task.harnessRun.phase=phase;addEvent(task,{type:'harness2',text:'Harness² · '+phase.label+' · '+(phase.action==='propose'?'提出配置':'副本探测')});}});
+    onEvent:event=>onEvent(task,event,runtime),onPhase:phase=>{if(active.get(task.id)!==runtime||runtime.cancelled||runtime.eventsClosed)return;task.pending=[];task.liveProgress=[];task.draft='';task.status='running';executionPhase(task,'working','提示词优化 · '+phase.label);task.harnessRun.phases.push(phase);task.harnessRun.phase=phase;addEvent(task,{type:'harness2',text:'Harness² · '+phase.label+' · '+(phase.action==='propose'?'提出配置':'副本探测')});}});
    await engine.start();if(runtime.cancelled)return;const result=safe(await engine.send());if(runtime.cancelled)return;
    task.harnessRun={...task.harnessRun,status:result.successful?'ready':'failed',result,completedAt:new Date().toISOString()};
    task.messages.push({id:randomUUID(),role:'assistant',text:'Harness² 优化'+(result.successful?'完成，配置等待你确认采用。':'未通过，不能采用配置。')+' 原项目未自动写回。'+(result.method?.ledger?' 探测 '+result.method.ledger.R+' 次，配置阶段 '+result.method.ledger.P+' 次。':''),at:new Date().toISOString()});
    task.error=null;
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);task.harnessRun.status='failed';addEvent(task,{type:'error',text:task.error});}}
-  finally{clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();if(runtime.cancelled)task.harnessRun.status='stopped';task.status=runtime.cancelled?'stopped':finalStatus;finishExecution(task,task.status);task.pending=[];task.liveProgress=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
+  finally{runtime.eventsClosed=true;clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();if(runtime.cancelled)task.harnessRun.status='stopped';task.status=runtime.cancelled?'stopped':finalStatus;finishExecution(task,task.status);task.pending=[];task.liveProgress=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
  }
 
  function launch(task,text,profile,agent,{continuation=false}={}){

@@ -68,3 +68,9 @@ The [two-axis review](dynamic-switching-review.md) identified and verified the l
 gfot 0.7.1-h2.1: 125 automated tests passed with zero failures or skips. Syntax checks passed. Source and packaged Electron workflows validate actual thought signals as status only, tool activity, approvals, frozen elapsed time, collapsed public progress, formatted final answers and native clipboard copy. Interrupted public segments survive restart without duplication. Standards and Spec reviews completed follow-up with no remaining findings.
 
 [Packaged UI report](execution-ui-check.json) · [Interface capture](execution-answer.png) · [Acceptance criteria](execution-ui-spec.md). The UI workflows use synthetic providers and temporary projects; they do not validate additional paid-provider capabilities. Granular thinking and tool states appear only when the selected adapter reports them.
+
+## Execution reliability — 2026-10-25
+
+gfot 0.7.2-h2.1 fixes stale execution events, loss of streamed public answers when history contains no text, and an ACP process-group cleanup race. Each fix has a [local issue record](issues/README.md). These records are not published GitHub Issues.
+
+The final full suite passed 129 tests, with zero failures or skips. Syntax checks and source Electron smoke passed. The final packaged Electron smoke also passed using synthetic services, including Agent switching, shared project/task memory, approvals and Harness² refinement. No real account or paid-provider calls were added. [Packaged report](reliability-ui-check.json) · [Two-axis review](reliability-review.md).

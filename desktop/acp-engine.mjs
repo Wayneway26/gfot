@@ -68,6 +68,11 @@ export class AcpEngine{
   try{process.kill(-pid,'SIGTERM');}catch{}
   await Promise.race([this.exit,new Promise(r=>setTimeout(r,700))]);
   try{process.kill(-pid,'SIGKILL');}catch{}
+  // SIGKILL delivery and process reaping are asynchronous. Confirm local
+  // cleanup independently of the native prompt acknowledgement.
+  const alive=()=>{try{process.kill(-pid,0);return true;}catch{return false;}};
+  const deadline=Date.now()+2000;while(alive()&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));
+  this.cancellationConfirmed=this.cancellationConfirmed&&!alive();
   return {confirmed:this.cancellationConfirmed};
  })();}
 }
