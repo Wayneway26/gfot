@@ -74,3 +74,9 @@ gfot 0.7.1-h2.1: 125 automated tests passed with zero failures or skips. Syntax 
 gfot 0.7.2-h2.1 fixes stale execution events, loss of streamed public answers when history contains no text, and an ACP process-group cleanup race. Each fix has a [local issue record](issues/README.md). These records are not published GitHub Issues.
 
 The final full suite passed 129 tests, with zero failures or skips. Syntax checks and source Electron smoke passed. The final packaged Electron smoke also passed using synthetic services, including Agent switching, shared project/task memory, approvals and Harness² refinement. No real account or paid-provider calls were added. [Packaged report](reliability-ui-check.json) · [Two-axis review](reliability-review.md).
+
+## Account usage panel — 2026-10-26
+
+gfot 0.8.0-h2.1 adds a sidebar Accounts & usage panel. Imported Codex accounts can manually refresh the existing allowance windows; other native Agent and API balances are explicitly unsupported. Saved credentials, historical inference verification and available allowance snapshots are shown separately.
+
+133 automated tests passed, with zero failures/skips, and syntax checks passed. Source and final packaged Electron workflows passed, including the new panel, explicit refresh, retained snapshot after failure, no query on open and account-management navigation. Quota transport in Electron was simulated; a separate account-manager test verifies the existing query/cache behavior with synthetic responses. No real provider allowance or paid-model calls were made. [Packaged report](account-usage-ui-check.json) · [Review](account-usage-review.md) · [Usage](account-usage.md).

@@ -26,7 +26,7 @@ gfot is a desktop client for managing AI coding tasks in local projects. Keep pr
 
 - **Project-based tasks.** Select a local folder and keep conversations and execution records with the task.
 - **Local Agent execution.** Select bundled OpenCode or an installed OpenCode, WorkBuddy or WorkBuddy AI CLI through ACP. An experimental native Doubao desktop adapter is also available. Each local executor uses its own authentication and quota.
-- **Your own accounts.** Import an existing Codex login or configure an API, local model service or compatible proxy.
+- **Your own accounts.** Import an existing Codex login or configure an API, local model service or compatible proxy. Open Accounts & usage to inspect credential status and supported allowance windows.
 - **Switch and continue.** Retain per-Agent sessions and hand over project memory, task history, tool results and workspace state to continue the same task.
 - **Readable execution.** Follow thinking signals, tool activity and approval requests as they happen. Progress stays collapsed; answers render with headings, lists and copyable code.
 - **Harness refinement.** Evaluate instruction configurations on project copies with Harness² and adopt a result for subsequent turns.

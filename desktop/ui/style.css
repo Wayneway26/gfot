@@ -232,3 +232,28 @@ dialog .actions { display: flex; justify-content: flex-end; gap: 9px; margin-top
 .continuation-note p { font-size:11px; line-height:1.7; }
 @keyframes execution-pulse { 0%,100% { opacity:.35; } 50% { opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .active .execution-indicator { animation:none; } }
+
+#usage { display:flex; align-items:center; gap:10px; width:100%; padding:11px; background:transparent; border:0; text-align:left; color:#45546e; }
+#usage:hover { background:#eef3fa; }
+.usage-icon { color:var(--accent); font-size:18px; width:16px; line-height:16px; }
+.quota-intro h2 { margin:10px 0; }
+.quota-intro p,.quota-note,.quota-timestamp { color:var(--muted); line-height:1.7; font-size:12px; overflow-wrap:anywhere; }
+.quota-summary { display:flex; flex-wrap:wrap; gap:10px 24px; padding:16px; border-radius:12px; background:var(--accent-soft); margin:20px 0; color:#45546e; }
+.quota-summary strong { margin-left:8px; color:var(--ink); }
+.quota-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr)); gap:12px; margin-bottom:24px; }
+.quota-card { min-width:0; border:1px solid var(--line); border-radius:12px; padding:17px; }
+.quota-card-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; overflow-wrap:anywhere; }
+.quota-card-heading small { display:block; color:var(--muted); font-size:11px; margin-top:5px; }
+.quota-badge { flex:none; font-size:10px; padding:4px 7px; border-radius:6px; background:#f1f4f8; color:#65738b; }
+.quota-badge.ready { color:#087587; background:#edfafd; }
+.quota-badge.warning { color:#986015; background:#fff6e7; }
+.quota-window { margin:16px 0; }
+.quota-window > div { display:flex; justify-content:space-between; gap:12px; font-size:12px; }
+.quota-window strong { color:var(--accent); }
+.quota-window meter { display:block; width:100%; height:12px; margin:8px 0; accent-color:var(--accent); }
+.quota-window small { color:var(--muted); font-size:11px; }
+.quota-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.quota-empty { color:var(--muted); padding:14px 0; }
+.quota-error { color:#aa3939; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+
+dialog:has(#quota-panel) { width:min(900px,92vw); }
