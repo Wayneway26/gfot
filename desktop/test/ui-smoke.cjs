@@ -28,12 +28,12 @@ const gateway=http.createServer(async(req,res)=>{
  models.push(body.model);res.writeHead(200,{'content-type':'text/event-stream'});res.end('data: '+JSON.stringify({id:'synthetic',object:'chat.completion.chunk',model:body.model,choices:[{index:0,delta:{content},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n');
 });
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
-app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-load',async()=>{try{
+app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThrottling(false);win.webContents.once('did-finish-load',async()=>{try{
  const js=source=>win.webContents.executeJavaScript(source);
  const until=async expression=>{for(let i=0;i<1000;i++){const value=await js(expression);if(value)return value;await delay(50);}throw Error('UI condition timed out: '+expression);};
  const chooseAgent=async(id,resume=false)=>{await js(`document.querySelector('#agent-select').value=${JSON.stringify(id)};document.querySelector('#agent-select').dispatchEvent(new Event('change'))`);await until("!!document.querySelector('#modal-form')?.elements.agentId");await js(`document.querySelector('#modal-form').elements.resume.checked=${resume};document.querySelector('#modal-form').requestSubmit()`);await until("!document.querySelector('#dialog').open");};
  const api=async(route,body)=>js(`fetch('/api/${route}',{method:'${body===undefined?'GET':'POST'}',headers:{'content-type':'application/json'},body:${body===undefined?'undefined':JSON.stringify(JSON.stringify(body))}}).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);return data;})`);
- await until("document.body.innerText.includes('一个项目')");
+ await until("document.body.innerText.includes('今天，想做点什么')");
  await until("Array.from(document.querySelectorAll('img')).every(img => img.complete && img.naturalWidth > 0)");
  assert.equal(await js('typeof require'),'undefined');assert.equal(await js('typeof gfotDesktop.chooseFolder'),'function');assert.equal(await js('typeof gfotDesktop.importCodex'),'function');assert.equal(await js('typeof gfotDesktop.loginChatGPT'),'function');
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop.png'),(await win.webContents.capturePage()).toPNG());
@@ -82,13 +82,25 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  assert.equal(await js("document.querySelector('#profile-select').value"),two.id,'connection edits must preserve selected model');
  await js("document.querySelector('#prompt').value='Synthetic second turn';document.querySelector('#composer').requestSubmit()");
  await until("document.querySelector('#messages').innerText.includes('Synthetic second turn') && document.querySelector('#status').textContent==='等待任务'");
+ await js("document.querySelector('#home').click()");
+ assert.equal(await js("document.querySelector('#workspace').hidden"),true);
+ assert.ok(await js("document.querySelector('#recent-tasks [data-task]')?.textContent.includes('Synthetic UI smoke')"));
+ await delay(200);fs.writeFileSync(path.join(os.tmpdir(),'gfot-home-recent.png'),(await win.webContents.capturePage()).toPNG());
+ await js(`document.querySelector('#recent-tasks [data-task="${taskId}"]').click()`);
+ assert.equal(await js("document.querySelector('#workspace').hidden"),false);
+ assert.ok((await js("document.querySelector('#messages').innerText")).includes('Synthetic second turn'));
  assert.deepEqual(models,['alpha','beta']);
  const state=await api('state');assert.equal(state.tasks[0].messages.length,4);
  await js("document.querySelector('#settings').click()");assert.equal(await js("document.querySelector('#dialog').open"),true);await js("document.querySelector('#settings-close').click()");
  win.setSize(840,600);await delay(200);
  const compact=await js(`({viewport:innerWidth,body:document.documentElement.scrollWidth,send:document.querySelector('#composer button[type=submit]').getBoundingClientRect().right})`);
  assert.ok(compact.body<=compact.viewport && compact.send<=compact.viewport,'compact layout must keep the send button visible');
+ assert.ok(await js("document.querySelector('#composer').getBoundingClientRect().height < 220"),'compact composer leaves room for conversation');
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-compact.png'),(await win.webContents.capturePage()).toPNG());
+ await js("document.querySelector('#home').click()");
+ assert.ok(await js("document.documentElement.scrollWidth<=innerWidth"),'compact home stays within viewport');
+ await delay(180);fs.writeFileSync(path.join(os.tmpdir(),'gfot-home-compact.png'),(await win.webContents.capturePage()).toPNG());
+ await js(`document.querySelector('#recent-tasks [data-task="${taskId}"]').click()`);
  win.setSize(1240,820);await delay(200);
  await js("document.querySelector('#project-notes').click();document.querySelector('#modal-form').elements.text.value='Project-wide fixture convention';document.querySelector('#modal-form').requestSubmit()");
  await until("!document.querySelector('#dialog').open");
@@ -119,6 +131,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  const h2=(await api('state')).tasks[0].harnessRun;assert.equal(h2.result.method.ledger.R,4);assert.equal(h2.result.method.ledger.P,3);
  assert.equal(fs.readFileSync(path.join(projectDir,'fixture.txt'),'utf8'),'Synthetic project source');
  await js("document.querySelector('#h2-adopt').click()");await until("document.querySelector('#h2-clear')");
+ await delay(450);fs.writeFileSync(path.join(os.tmpdir(),'gfot-design-harness.png'),(await win.webContents.capturePage()).toPNG());
  await js("document.querySelector('#prompt').value='Continue after harness adoption';document.querySelector('#composer').requestSubmit()");
  await until("document.querySelector('#messages').innerText.includes('Continue after harness adoption') && document.querySelector('#status').textContent==='等待任务'");
  assert.ok(requestBodies.at(-1).includes('H2_FIXTURE_ADOPTED'),'adopted prompt must reach the real executor');
@@ -151,7 +164,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.once('did-finish-
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-dynamic-switch.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-harness2.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-task.png'),(await win.webContents.capturePage()).toPNG());
- fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['account usage panel: manual refresh, cached windows and failure states (synthetic transport)','real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','brand SVG assets loaded','840px composer stays within viewport','screenshot']},null,2));
+ fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['workspace redesign: home/recent-task navigation, retained conversation and compact composer','account usage panel: manual refresh, cached windows and failure states (synthetic transport)','real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','brand SVG assets loaded','840px composer stays within viewport','screenshot']},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({ok:false,error:String(error),stack:error.stack}));gateway.close();app.exit(1);}finally{gateway.close();app.quit();}});});
 require(resources?path.join(resources,'app.asar','desktop','main.cjs'):path.join(__dirname,'..','main.cjs'));
 setTimeout(()=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:'120s timeout'}));app.exit(1);},120000).unref();

@@ -80,3 +80,9 @@ The final full suite passed 129 tests, with zero failures or skips. Syntax check
 gfot 0.8.0-h2.1 adds a sidebar Accounts & usage panel. Imported Codex accounts can manually refresh the existing allowance windows; other native Agent and API balances are explicitly unsupported. Saved credentials, historical inference verification and available allowance snapshots are shown separately.
 
 133 automated tests passed, with zero failures/skips, and syntax checks passed. Source and final packaged Electron workflows passed, including the new panel, explicit refresh, retained snapshot after failure, no query on open and account-management navigation. Quota transport in Electron was simulated; a separate account-manager test verifies the existing query/cache behavior with synthetic responses. No real provider allowance or paid-model calls were made. [Packaged report](account-usage-ui-check.json) · [Review](account-usage-review.md) · [Usage](account-usage.md).
+
+## Workspace design — 2026-10-26
+
+gfot 0.9.0-h2.1 replaces accumulated styling with one neutral desktop design system: compact project navigation, smaller brand and task headers, a focused conversation column, a compact executor/model composer footer and consistent account/settings sheets. Home and real recent-task navigation retain existing conversations.
+
+134 automated tests passed with no failures/skips. Syntax checks and source/final packaged Electron workflows passed using synthetic services. Actual welcome, task, thinking/tool state, quota, Harness² and 840×600 layouts were inspected. A review finding about recent-task ordering was fixed and independently verified. [Packaged UI report](workspace-design-ui-check.json) · [Two-axis review](workspace-design-review.md). No real provider calls were made for this UI change.

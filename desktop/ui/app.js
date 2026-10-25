@@ -1,5 +1,5 @@
 import {quotaOverview} from './quota-view.js';
-import {transcript,liveResponse,executionMarkup} from './render.js';
+import {transcript,liveResponse,executionMarkup,recentTasks} from './render.js';
 const $=s=>document.querySelector(s);
 const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let state={tasks:[],profiles:[],accounts:[]},selected=localStorage.getItem('gfot-task'),rendered=null,messageSignature='',approvalSignature='',liveSignature='',executionSignature='',showDetails=false;
@@ -161,6 +161,7 @@ setInterval(updateElapsed,1000);
 function render(){
  $('#task-list').innerHTML=(state.projects||[]).map(p=>{const tasks=state.tasks.filter(t=>t.projectId===p.id);return `<section class="project-group"><button class="project-toggle" data-project="${p.id}" title="${escape(p.folder)}" aria-expanded="${!collapsedProjects.has(p.id)}"><span>${collapsedProjects.has(p.id)?'▸':'▾'} ${escape(p.name)}</span><small>${tasks.length}</small></button><div ${collapsedProjects.has(p.id)?'hidden':''}>${tasks.map(t=>`<button class="task-item ${t.id===selected?'active':''}" data-task="${t.id}"><strong>${escape(t.title)}</strong><small>${escape(agentName(t.agentId))} · ${t.transition?'正在交接':labels[t.status]||t.status}</small></button>`).join('')}</div></section>`;}).join('')||'<p class="section-label">还没有项目任务</p>';
  $('#connection-dot').classList.toggle('ready',state.profiles.length>0);
+ const recent=$('#recent-tasks');recent.hidden=!state.tasks.length;recent.innerHTML='<div class="recent-heading">最近任务</div>'+recentTasks(state.tasks).map(t=>`<button class="recent-task" type="button" data-task="${escape(t.id)}"><strong>${escape(t.title)}</strong><small>${escape(state.projects?.find(p=>p.id===t.projectId)?.name||'项目')}</small></button>`).join('');
  const task=state.tasks.find(t=>t.id===selected);$('#welcome').hidden=!!task;$('#workspace').hidden=!task;$('#breadcrumb').textContent=task?'工作区 / '+task.title:'工作区';if(!task)return;
  const switched=rendered!==selected;const agentId=task.agentId||'opencode';$('#task-details').hidden=!showDetails;$('#toggle-details').setAttribute('aria-expanded',String(showDetails));$('#toggle-details').textContent=showDetails?'收起详情':'任务详情';renderExecution(task);
  const agentOptions=availableAgents().map(a=>`<option value="${a.id}">${escape(a.name)}</option>`).join('');if($('#agent-select').innerHTML!==agentOptions)$('#agent-select').innerHTML=agentOptions;$('#agent-select').value=agentId;$('#agent-select').disabled=!!task.transition||task.harnessRun?.status==='running';$('#switch-agent').disabled=$('#agent-select').disabled;$('#task-notes').disabled=busy(task);$('#project-notes').disabled=state.tasks.some(t=>t.projectId===task.projectId&&busy(t));
@@ -185,6 +186,7 @@ $('#switch-agent').onclick=()=>switchAgent();$('#resume-switch').onclick=()=>swi
 $('#task-notes').onclick=editTaskNotes;
 $('#h2-optimize').onclick=()=>{showDetails=true;render();optimizeHarness();};
 $('#toggle-details').onclick=()=>{showDetails=!showDetails;render();};
+$('#home').onclick=()=>{selected=null;localStorage.removeItem('gfot-task');render();};
 $('#usage').onclick=quotaPanel;$('#settings').onclick=settings;$('#new-task').onclick=()=>createTask().catch(e=>toast(e.message));$('#welcome-new').onclick=$('#new-task').onclick;
 $('#composer').onsubmit=async event=>{event.preventDefault();const text=$('#prompt').value.trim();if(!text)return;const button=$('#send');button.disabled=true;try{await api('tasks/'+selected+'/prompt',{text,profileId:$('#profile-select').value});$('#prompt').value='';state=await api('state');render();}catch(e){toast(e.message);}finally{button.disabled=false;}};
 $('#prompt').onkeydown=event=>{if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();$('#composer').requestSubmit();}};

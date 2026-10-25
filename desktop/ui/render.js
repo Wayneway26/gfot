@@ -42,3 +42,8 @@ export function executionMarkup(task){
  const tools=e.steps||[],done=tools.filter(t=>t.status==='completed').length;
  return `<div class="execution-line ${active?'active':''}"><span class="execution-indicator" aria-hidden="true"></span><strong>${html(phase)}</strong><span class="execution-elapsed" data-start="${html(e.startedAt)}" data-end="${html(e.finishedAt||'')}"></span></div>${e.detail?`<div class="execution-detail">${html(e.detail)}</div>`:''}${tools.length?`<details class="execution-steps"><summary>${active?'执行动态':'本轮执行记录'} · 最近 ${tools.length} 项操作${done?'，'+done+' 项完成':''}</summary><ol>${tools.map(t=>`<li><span class="step-state ${t.status==='completed'?'complete':''}">${html(statuses[t.status]||'已报告')}</span><span>${html(t.tool)}</span>${t.detail?`<pre>${html(t.detail)}</pre>`:''}</li>`).join('')}</ol></details>`:''}`;
 }
+
+export function recentTasks(tasks){
+ const activity=task=>{const updated=Date.parse(task.updatedAt),created=Date.parse(task.createdAt);return Number.isFinite(updated)?updated:Number.isFinite(created)?created:0;};
+ return [...tasks].sort((a,b)=>activity(b)-activity(a)).slice(0,4);
+}
