@@ -86,3 +86,9 @@ gfot 0.8.0-h2.1 adds a sidebar Accounts & usage panel. Imported Codex accounts c
 gfot 0.9.0-h2.1 replaces accumulated styling with one neutral desktop design system: compact project navigation, smaller brand and task headers, a focused conversation column, a compact executor/model composer footer and consistent account/settings sheets. Home and real recent-task navigation retain existing conversations.
 
 134 automated tests passed with no failures/skips. Syntax checks and source/final packaged Electron workflows passed using synthetic services. Actual welcome, task, thinking/tool state, quota, Harness² and 840×600 layouts were inspected. A review finding about recent-task ordering was fixed and independently verified. [Packaged UI report](workspace-design-ui-check.json) · [Two-axis review](workspace-design-review.md). No real provider calls were made for this UI change.
+
+## Relay brand adoption — 2026-10-26
+
+gfot 0.9.1-h2.1 adopts the approved charcoal/blue Relay g in the client, README header and native macOS icon. One canonical SVG supplies every derived export while preserving the approved viewBox and clip geometry. Updated UI screenshots are real Electron captures with synthetic task/provider data.
+
+Syntax checks, asset generation and source/final packaged Electron workflows passed. Source and packaged routes serve the exact approved mark. Independent SVG/PNG pixel-bound checks, all ten native icon sizes and bundled ICNS byte equality passed. [Packaged UI report](relay-brand-ui-check.json) · [Review](relay-brand-review.md). This asset-focused patch did not rerun the full unit suite; the previous 134-test result belongs to 0.9.0. No real provider calls were made.
