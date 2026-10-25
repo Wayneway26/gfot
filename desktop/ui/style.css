@@ -13,7 +13,7 @@
 }
 :root[data-theme="dark"] {
  --ink:#e7ebe1; --body-text:#d4dacb; --muted:#a6af9d; --subtle:#929c87;
- --line:#343a30; --line-strong:#4b5443; --paper:#171916; --surface:#20231f; --side:#131511;
+ --line:#343a30; --line-strong:#4b5443; --paper:#000000; --surface:#20231f; --side:#131511;
  --panel:#242921; --inset:#1b1f18; --bubble:#292f24; --hover:#2c3227; --selected:#303a29;
  --accent:#90adff; --accent-solid:#3764de; --accent-hover:#4471ee; --accent-soft:#27324d;
  --focus:#8faeff; --selection:#344c7a; --dot:#839176;

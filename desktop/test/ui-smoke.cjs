@@ -42,7 +42,8 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  await new Promise(resolve=>{win.webContents.once('did-finish-load',resolve);win.webContents.reload();});
  await until("document.documentElement.dataset.themeReady==='true' && document.documentElement.dataset.theme==='dark' && typeof gfotDesktop.chooseFolder==='function'");
  assert.equal(await js('gfotDesktop.initialTheme'),'dark','reload reads the persistent native preference');
- assert.equal(await js("getComputedStyle(document.body).backgroundColor"),'rgb(23, 25, 22)');
+ assert.equal(await js("getComputedStyle(document.body).backgroundColor"),'rgb(0, 0, 0)');
+ assert.equal(win.getBackgroundColor().toLowerCase(),'#000000','native dark window is OLED black too');
  assert.equal(await js("getComputedStyle(document.querySelector('.brand-mark-light')).display"),'none');
  await delay(250);fs.writeFileSync(path.join(os.tmpdir(),'gfot-theme-dark-home.png'),(await win.webContents.capturePage()).toPNG());
  await js("document.querySelector('#settings').click()");

@@ -98,3 +98,7 @@ Syntax checks, asset generation and source/final packaged Electron workflows pas
 gfot 0.10.0-h2.1 adds sidebar light, dark and system choices, a native atomic preference store independent of the local server port, semantic colors throughout the client and a derived dark logo variant. Changes retain task history and unsent drafts.
 
 139 automated tests passed with zero failures/skips. Syntax checks and source/final packaged Electron workflows passed, including persisted selection after reload, system changes, dark settings/usage panels and preserved task drafts/history. Independent Standards and Spec reviews reported no remaining findings. UI services were synthetic; no real provider calls were made. Builds remain unsigned/unnotarized. [Packaged report](appearance-ui-check.json) · [Review](appearance-review.md) · [Usage](appearance.md).
+
+## OLED black workspace — 2026-10-26
+
+gfot 0.10.1-h2.1 changes the dark workspace canvas and native window background to `#000000`. Elevated sidebar, input and dialog surfaces retain their previous colors. Syntax checks and source/final packaged Electron smoke passed with synthetic services. Native assertions verify both the computed page background and Electron window color; three blank-workspace screenshot samples were RGB(0,0,0). The previous 139-test full-suite result belongs to 0.10.0; this color-only patch reran the native smoke rather than the full suite. [Packaged report](oled-ui-check.json).

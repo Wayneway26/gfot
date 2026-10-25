@@ -6,7 +6,7 @@ const {createAppearanceStore}=require('./appearance.cjs');
 app.setName('gfot');
 let window,worker,base,appearance,quitting=false;
 const root=join(__dirname,'..');
-const themeBackground=()=>nativeTheme.shouldUseDarkColors?'#171916':'#ffffff';
+const themeBackground=()=>nativeTheme.shouldUseDarkColors?'#000000':'#ffffff';
 nativeTheme.on('updated',()=>{if(window&&!window.isDestroyed())window.setBackgroundColor(themeBackground());});
 function engineBinary(){return app.isPackaged?join(process.resourcesPath,'engine','opencode'):join(root,'node_modules',`opencode-darwin-${process.arch}`,'bin','opencode');}
 function masterKey(dir){
