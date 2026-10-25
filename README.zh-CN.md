@@ -18,7 +18,10 @@
 
 <br />
 
-![gfot 桌面客户端](docs/desktop-preview.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/desktop-preview-dark.png" />
+  <img src="docs/desktop-preview.png" alt="gfot 桌面客户端" />
+</picture>
 
 ## 项目介绍
 
@@ -30,6 +33,8 @@ gfot 用于管理本地项目中的 AI 编程任务，将项目目录、任务�
 - **切换 Agent，继续原任务。** 保留项目目录与对话，交接项目记忆、工具结果和工作区状态；遇到额度限制可选择其他执行器继续。
 - **看清执行过程。** 实时查看思考状态、工具活动和授权请求；过程更新默认收起，回答支持标题、列表和代码复制。
 - **优化执行配置。** 使用 Harness² 在项目副本中评估指令配置，选择采用结果用于后续执行。
+
+在侧栏切换浅色、深色或跟随系统，外观偏好保存在本机。
 
 ## 账号与服务
 

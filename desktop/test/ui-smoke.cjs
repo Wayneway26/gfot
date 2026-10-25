@@ -1,5 +1,5 @@
 // Run separately with Electron on macOS. All model output is synthetic/local.
-const {app,dialog,utilityProcess,clipboard}=require('electron');
+const {app,dialog,utilityProcess,clipboard,nativeTheme}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict');
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gfot-ui-smoke-'));
 const resources=process.env.GFOT_QA_RESOURCES;
@@ -35,6 +35,24 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  const api=async(route,body)=>js(`fetch('/api/${route}',{method:'${body===undefined?'GET':'POST'}',headers:{'content-type':'application/json'},body:${body===undefined?'undefined':JSON.stringify(JSON.stringify(body))}}).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);return data;})`);
  await until("document.body.innerText.includes('今天，想做点什么')");
  await until("Array.from(document.querySelectorAll('img')).every(img => img.complete && img.naturalWidth > 0)");
+ await until("document.documentElement.dataset.themeReady==='true'");
+ await js("document.querySelector('[data-theme-choice=dark]').click()");
+ await until("document.documentElement.dataset.theme==='dark' && document.querySelector('[data-theme-choice=dark]').getAttribute('aria-pressed')==='true'");
+ assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'appdata/appearance.json'),'utf8')).theme,'dark');
+ await new Promise(resolve=>{win.webContents.once('did-finish-load',resolve);win.webContents.reload();});
+ await until("document.documentElement.dataset.themeReady==='true' && document.documentElement.dataset.theme==='dark' && typeof gfotDesktop.chooseFolder==='function'");
+ assert.equal(await js('gfotDesktop.initialTheme'),'dark','reload reads the persistent native preference');
+ assert.equal(await js("getComputedStyle(document.body).backgroundColor"),'rgb(23, 25, 22)');
+ assert.equal(await js("getComputedStyle(document.querySelector('.brand-mark-light')).display"),'none');
+ await delay(250);fs.writeFileSync(path.join(os.tmpdir(),'gfot-theme-dark-home.png'),(await win.webContents.capturePage()).toPNG());
+ await js("document.querySelector('#settings').click()");
+ assert.equal(await js("getComputedStyle(document.querySelector('#dialog')).backgroundColor"),'rgb(32, 35, 31)');
+ await delay(200);fs.writeFileSync(path.join(os.tmpdir(),'gfot-theme-dark-settings.png'),(await win.webContents.capturePage()).toPNG());
+ await js("document.querySelector('#settings-close').click();document.querySelector('[data-theme-choice=system]').click()");
+ await until("document.documentElement.dataset.themePreference==='system' && !document.querySelector('[data-theme-choice=system]').disabled");
+ nativeTheme.themeSource='dark';await until("document.documentElement.dataset.theme==='dark'");nativeTheme.themeSource='light';await until("document.documentElement.dataset.theme==='light'");
+ await js("document.querySelector('[data-theme-choice=light]').click()");await until("document.documentElement.dataset.themePreference==='light'");
+
  assert.equal(await js("fetch('/brand-mark.svg').then(r=>r.text())"),fs.readFileSync(path.join(__dirname,'../ui/brand-mark.svg'),'utf8'),'renderer receives the approved mark, including packaged resources');
  assert.equal(await js('typeof require'),'undefined');assert.equal(await js('typeof gfotDesktop.chooseFolder'),'function');assert.equal(await js('typeof gfotDesktop.importCodex'),'function');assert.equal(await js('typeof gfotDesktop.loginChatGPT'),'function');
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop.png'),(await win.webContents.capturePage()).toPNG());
@@ -53,6 +71,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
 
  // Only the quota UI transport below is simulated; it must never query a real account.
  await js(`globalThis.originalQuotaFetch=window.fetch;globalThis.quotaFixtureCalls=0;globalThis.quotaFixtureFailure=false;globalThis.quotaSnapshot=null;window.fetch=async function(url,options){if(String(url)==='/api/accounts/quota'){quotaFixtureCalls++;if(quotaFixtureFailure)return new Response(JSON.stringify({error:'Synthetic quota unavailable'}),{status:503});quotaSnapshot={supported:true,checkedAt:new Date().toISOString(),primary:{usedPercent:25,windowSeconds:18000,resetAt:Math.floor(Date.now()/1000)+3600},secondary:{usedPercent:60,windowSeconds:604800}};return new Response(JSON.stringify(quotaSnapshot));}const response=await originalQuotaFetch(url,options);if(String(url)==='/api/state'&&quotaSnapshot){const data=await response.json();data.accounts[0].quota=quotaSnapshot;return new Response(JSON.stringify(data));}return response;};void 0;`);
+ await js("document.querySelector('[data-theme-choice=dark]').click()");await until("document.documentElement.dataset.theme==='dark'");
  await js("document.querySelector('#usage').click()");
  assert.equal(await js('quotaFixtureCalls'),0,'opening usage does not query upstream');
  assert.ok((await js("document.querySelector('#quota-panel').innerText")).includes('不能查询其登录有效期或剩余额度'));
@@ -63,8 +82,9 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  await until("document.querySelector('#quota-panel').innerText.includes('Synthetic quota unavailable') && !document.querySelector('[data-refresh-quota]').disabled");
  assert.ok((await js("document.querySelector('#quota-panel').innerText")).includes('剩余 75%'));
  assert.ok(!(await js("document.querySelector('#quota-panel').innerHTML")).includes(fixtureAccess));
- await delay(250);fs.writeFileSync(path.join(os.tmpdir(),'gfot-account-usage.png'),(await win.webContents.capturePage()).toPNG());
- await js("document.querySelector('#usage-manage').click()");assert.ok(await js("!!document.querySelector('#import-codex')"));await js("document.querySelector('#settings-close').click();window.fetch=originalQuotaFetch;void 0");
+ await delay(250);fs.writeFileSync(path.join(os.tmpdir(),'gfot-theme-dark-usage.png'),(await win.webContents.capturePage()).toPNG());
+ await js("document.querySelector('#usage-manage').click()");assert.ok(await js("!!document.querySelector('#import-codex')"));await js("document.querySelector('#settings-close').click();window.fetch=originalQuotaFetch;document.querySelector('[data-theme-choice=light]').click();void 0");
+ await until("document.documentElement.dataset.theme==='light'");
  await js("document.querySelector('#settings').click();document.querySelector('[data-verify-profile]').click();document.querySelector('#modal-form').requestSubmit()");
  assert.equal(diagnostics,0,'diagnostic requires explicit consent');
  await js("document.querySelector('#modal-form input[type=checkbox]').checked=true;document.querySelector('#modal-form').requestSubmit()");
@@ -161,11 +181,18 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  assert.equal(await js("document.querySelector('#task-details').hidden"),true);
  await delay(400);
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-answer.png'),(await win.webContents.capturePage()).toPNG());
+ const beforeThemeHistory=JSON.stringify((await api('state')).tasks[0].messages);
+ await js("document.querySelector('#prompt').value='Unsent theme fixture';document.querySelector('[data-theme-choice=dark]').click()");await until("document.documentElement.dataset.theme==='dark'");
+ assert.equal(await js("document.querySelector('#prompt').value"),'Unsent theme fixture');assert.equal(JSON.stringify((await api('state')).tasks[0].messages),beforeThemeHistory);
+ assert.equal(await js("getComputedStyle(document.querySelector('#composer')).backgroundColor"),'rgb(32, 35, 31)');
+ await delay(250);fs.writeFileSync(path.join(os.tmpdir(),'gfot-theme-dark-task.png'),(await win.webContents.capturePage()).toPNG());
+ await js("document.querySelector('#prompt').value='';document.querySelector('[data-theme-choice=light]').click()");await until("document.documentElement.dataset.theme==='light'");
+
  await js("document.querySelector('#handoff-report > details').open=true");
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-dynamic-switch.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-harness2.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-task.png'),(await win.webContents.capturePage()).toPNG());
- fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['workspace redesign: home/recent-task navigation, retained conversation and compact composer','account usage panel: manual refresh, cached windows and failure states (synthetic transport)','real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','approved relay mark served from source/packaged resources and loaded','840px composer stays within viewport','screenshot']},null,2));
+ fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['light/dark/system themes: native persistence, reload, system changes, dark sheets and preserved task draft/history','workspace redesign: home/recent-task navigation, retained conversation and compact composer','account usage panel: manual refresh, cached windows and failure states (synthetic transport)','real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','approved relay mark served from source/packaged resources and loaded','840px composer stays within viewport','screenshot']},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({ok:false,error:String(error),stack:error.stack}));gateway.close();app.exit(1);}finally{gateway.close();app.quit();}});});
 require(resources?path.join(resources,'app.asar','desktop','main.cjs'):path.join(__dirname,'..','main.cjs'));
 setTimeout(()=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:'120s timeout'}));app.exit(1);},120000).unref();

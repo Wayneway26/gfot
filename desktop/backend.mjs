@@ -16,7 +16,7 @@ import {listModels,verifyConnection} from './connections.mjs';
 import {createAccountManager} from './accounts.mjs';
 import {startAccountProxy,verifyResponses} from './account-proxy.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
-const files={'/':'index.html','/app.js':'app.js','/render.js':'render.js','/quota-view.js':'quota-view.js','/style.css':'style.css','/brand-mark.svg':'brand-mark.svg'};
+const files={'/':'index.html','/app.js':'app.js','/render.js':'render.js','/quota-view.js':'quota-view.js','/style.css':'style.css','/theme.js':'theme.js','/brand-mark-dark.svg':'brand-mark-dark.svg','/brand-mark.svg':'brand-mark.svg'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
 export async function startDesktopServer({dataDir,binary,key,harnessRunner,connectionFetch=fetch,accountFetch=fetch,agentRegistry,agentAppRoots,doubaoRoot,workspaceObserver=observeWorkspace,doubaoFactory=options=>new DoubaoEngine(options),acpFactory=options=>new AcpEngine(options),engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;const switches=new Map(),reservations=new Set();

@@ -1,10 +1,13 @@
-const {app,BrowserWindow,ipcMain,dialog,utilityProcess,safeStorage,Menu,shell,clipboard}=require('electron');
+const {app,BrowserWindow,ipcMain,dialog,utilityProcess,safeStorage,Menu,shell,clipboard,nativeTheme}=require('electron');
 const {join}=require('node:path');
 const {readFileSync,writeFileSync,mkdirSync,existsSync,statSync}=require('node:fs');
 const {randomBytes}=require('node:crypto');
+const {createAppearanceStore}=require('./appearance.cjs');
 app.setName('gfot');
-let window,worker,base,quitting=false;
+let window,worker,base,appearance,quitting=false;
 const root=join(__dirname,'..');
+const themeBackground=()=>nativeTheme.shouldUseDarkColors?'#171916':'#ffffff';
+nativeTheme.on('updated',()=>{if(window&&!window.isDestroyed())window.setBackgroundColor(themeBackground());});
 function engineBinary(){return app.isPackaged?join(process.resourcesPath,'engine','opencode'):join(root,'node_modules',`opencode-darwin-${process.arch}`,'bin','opencode');}
 function masterKey(dir){
  if(!safeStorage.isEncryptionAvailable())throw Error('系统钥匙串不可用，无法安全保存代理密钥。请解锁 macOS 钥匙串后重试。');
@@ -13,6 +16,12 @@ function masterKey(dir){
  const key=randomBytes(32).toString('base64');writeFileSync(path,safeStorage.encryptString(key),{mode:0o600});return key;
 }
 function trusted(event){if(!base||event.sender!==window?.webContents||!event.senderFrame?.url.startsWith(base+'/'))throw Error('Untrusted frame');}
+// The synchronous preload read returns only a validated, non-sensitive enum.
+ipcMain.on('gfot:theme-read',event=>{event.returnValue=event.sender===window?.webContents&&event.senderFrame===window?.webContents.mainFrame?appearance?.get()||'system':'system';});
+ipcMain.handle('gfot:theme-set',(event,value)=>{
+ trusted(event);const theme=appearance.set(value);nativeTheme.themeSource=theme;
+ window.setBackgroundColor(themeBackground());return {theme};
+});
 ipcMain.handle('gfot:copy-text',async(event,text)=>{trusted(event);if(typeof text!=='string'||text.length>80000)throw Error('复制内容无效');clipboard.writeText(text);return {ok:true};});
 ipcMain.handle('gfot:open-agent',async(event,id)=>{trusted(event);const {createAgentRegistry}=await import('./local-agents.mjs');const agent=createAgentRegistry().get(id);if(!agent.appPath)throw Error('没有可打开的应用');const error=await shell.openPath(agent.appPath);if(error)throw Error('无法打开 Agent 应用');return {ok:true};});
 ipcMain.handle('gfot:folder',async event=>{trusted(event);const result=await dialog.showOpenDialog(window,{title:'选择项目目录',properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0];});
@@ -34,7 +43,7 @@ ipcMain.handle('gfot:chatgpt-login',async(event,accountId)=>{
 });
 
 function createWindow(){
- window=new BrowserWindow({width:1240,height:820,minWidth:840,minHeight:600,title:'gfot',backgroundColor:'#ffffff',titleBarStyle:'hiddenInset',trafficLightPosition:{x:20,y:20},webPreferences:{preload:join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ window=new BrowserWindow({width:1240,height:820,minWidth:840,minHeight:600,title:'gfot',backgroundColor:themeBackground(),titleBarStyle:'hiddenInset',trafficLightPosition:{x:20,y:20},webPreferences:{preload:join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
  window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
  window.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith(base+'/'))event.preventDefault();});
  window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
@@ -43,6 +52,7 @@ function createWindow(){
 }
 async function boot(){
  const dir=app.getPath('userData');mkdirSync(dir,{recursive:true,mode:0o700});
+ appearance=createAppearanceStore(dir);nativeTheme.themeSource=appearance.get();
  const key=masterKey(dir),binary=engineBinary();if(!existsSync(binary))throw Error('内置执行器缺失，请重新安装 gfot。');
  worker=utilityProcess.fork(join(__dirname,'worker.mjs'),[],{stdio:'pipe',serviceName:'gfot local service'});
  worker.stderr.on('data',()=>{});worker.stdout.on('data',()=>{});

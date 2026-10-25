@@ -18,7 +18,10 @@ Local Agent execution, shared task context and your own accounts.
 
 <br />
 
-![gfot desktop client](docs/desktop-preview.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/desktop-preview-dark.png" />
+  <img src="docs/desktop-preview.png" alt="gfot desktop client" />
+</picture>
 
 ## Overview
 
@@ -30,6 +33,8 @@ gfot is a desktop client for managing AI coding tasks in local projects. Keep pr
 - **Switch and continue.** Retain per-Agent sessions and hand over project memory, task history, tool results and workspace state to continue the same task.
 - **Readable execution.** Follow thinking signals, tool activity and approval requests as they happen. Progress stays collapsed; answers render with headings, lists and copyable code.
 - **Harness refinement.** Evaluate instruction configurations on project copies with Harness² and adopt a result for subsequent turns.
+
+Light, dark and system appearance are available from the sidebar. Your preference is saved locally.
 
 ## Accounts and services
 

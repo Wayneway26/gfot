@@ -92,3 +92,9 @@ gfot 0.9.0-h2.1 replaces accumulated styling with one neutral desktop design sys
 gfot 0.9.1-h2.1 adopts the approved charcoal/blue Relay g in the client, README header and native macOS icon. One canonical SVG supplies every derived export while preserving the approved viewBox and clip geometry. Updated UI screenshots are real Electron captures with synthetic task/provider data.
 
 Syntax checks, asset generation and source/final packaged Electron workflows passed. Source and packaged routes serve the exact approved mark. Independent SVG/PNG pixel-bound checks, all ten native icon sizes and bundled ICNS byte equality passed. [Packaged UI report](relay-brand-ui-check.json) · [Review](relay-brand-review.md). This asset-focused patch did not rerun the full unit suite; the previous 134-test result belongs to 0.9.0. No real provider calls were made.
+
+## Light and dark appearance — 2026-10-26
+
+gfot 0.10.0-h2.1 adds sidebar light, dark and system choices, a native atomic preference store independent of the local server port, semantic colors throughout the client and a derived dark logo variant. Changes retain task history and unsent drafts.
+
+139 automated tests passed with zero failures/skips. Syntax checks and source/final packaged Electron workflows passed, including persisted selection after reload, system changes, dark settings/usage panels and preserved task drafts/history. Independent Standards and Spec reviews reported no remaining findings. UI services were synthetic; no real provider calls were made. Builds remain unsigned/unnotarized. [Packaged report](appearance-ui-check.json) · [Review](appearance-review.md) · [Usage](appearance.md).
