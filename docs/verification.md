@@ -102,3 +102,9 @@ gfot 0.10.0-h2.1 adds sidebar light, dark and system choices, a native atomic pr
 ## OLED black workspace — 2026-10-26
 
 gfot 0.10.1-h2.1 changes the dark workspace canvas and native window background to `#000000`. Elevated sidebar, input and dialog surfaces retain their previous colors. Syntax checks and source/final packaged Electron smoke passed with synthetic services. Native assertions verify both the computed page background and Electron window color; three blank-workspace screenshot samples were RGB(0,0,0). The previous 139-test full-suite result belongs to 0.10.0; this color-only patch reran the native smoke rather than the full suite. [Packaged report](oled-ui-check.json).
+
+## Neutral dark colors and brighter text — 2026-10-26
+
+gfot 0.10.2-h2.1 replaces green-tinted dark surfaces and foregrounds with neutral grayscale. The workspace remains pure black; body text is `#e8e8e8`, primary text `#f5f5f5`, secondary text `#c2c2c2` and subtle text `#a8a8a8`. The derived dark logo and its generator use neutral white too. Semantic status colors remain intentional.
+
+Syntax checks and source/final packaged Electron smoke passed using synthetic services, with actual computed neutral sidebar, bright foreground, dialog/input and native black window assertions. All four text levels exceed 4.5:1 against the tested primary dark surfaces; the lowest calculated ratio is 5.55:1. This color-only patch did not rerun the full unit suite. [Packaged report](neutral-dark-ui-check.json).

@@ -1,6 +1,6 @@
 {
   "name": "gfot",
-  "version": "0.10.1-h2.1",
+  "version": "0.10.2-h2.1",
   "private": true,
   "type": "module",
   "scripts": {

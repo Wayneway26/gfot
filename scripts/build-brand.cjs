@@ -9,7 +9,7 @@ app.whenReady().then(async()=>{
  let win;
  try{
   const mark=fs.readFileSync(path.join(root,'desktop/ui/brand-mark.svg'),'utf8');
-  fs.writeFileSync(path.join(root,'desktop/ui/brand-mark-dark.svg'),mark.replaceAll('#242624','#F0F2EC'));
+  fs.writeFileSync(path.join(root,'desktop/ui/brand-mark-dark.svg'),mark.replaceAll('#242624','#F5F5F5'));
   const viewBox=mark.match(/\bviewBox="([^"]+)"/)?.[1];if(!viewBox)throw Error('Brand mark needs a viewBox');
   const geometry=mark.replace(/^<svg[^>]*>/,'').replace(/<\/svg>\s*$/,'');
   function placeMark(x,y,width,height,prefix){

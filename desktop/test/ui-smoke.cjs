@@ -44,10 +44,12 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  assert.equal(await js('gfotDesktop.initialTheme'),'dark','reload reads the persistent native preference');
  assert.equal(await js("getComputedStyle(document.body).backgroundColor"),'rgb(0, 0, 0)');
  assert.equal(win.getBackgroundColor().toLowerCase(),'#000000','native dark window is OLED black too');
+ assert.equal(await js("getComputedStyle(document.body).color"),'rgb(245, 245, 245)','neutral bright foreground');
+ assert.equal(await js("getComputedStyle(document.querySelector('.sidebar')).backgroundColor"),'rgb(17, 17, 17)','neutral sidebar');
  assert.equal(await js("getComputedStyle(document.querySelector('.brand-mark-light')).display"),'none');
  await delay(250);fs.writeFileSync(path.join(os.tmpdir(),'gfot-theme-dark-home.png'),(await win.webContents.capturePage()).toPNG());
  await js("document.querySelector('#settings').click()");
- assert.equal(await js("getComputedStyle(document.querySelector('#dialog')).backgroundColor"),'rgb(32, 35, 31)');
+ assert.equal(await js("getComputedStyle(document.querySelector('#dialog')).backgroundColor"),'rgb(28, 28, 28)');
  await delay(200);fs.writeFileSync(path.join(os.tmpdir(),'gfot-theme-dark-settings.png'),(await win.webContents.capturePage()).toPNG());
  await js("document.querySelector('#settings-close').click();document.querySelector('[data-theme-choice=system]').click()");
  await until("document.documentElement.dataset.themePreference==='system' && !document.querySelector('[data-theme-choice=system]').disabled");
@@ -185,7 +187,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  const beforeThemeHistory=JSON.stringify((await api('state')).tasks[0].messages);
  await js("document.querySelector('#prompt').value='Unsent theme fixture';document.querySelector('[data-theme-choice=dark]').click()");await until("document.documentElement.dataset.theme==='dark'");
  assert.equal(await js("document.querySelector('#prompt').value"),'Unsent theme fixture');assert.equal(JSON.stringify((await api('state')).tasks[0].messages),beforeThemeHistory);
- assert.equal(await js("getComputedStyle(document.querySelector('#composer')).backgroundColor"),'rgb(32, 35, 31)');
+ assert.equal(await js("getComputedStyle(document.querySelector('#composer')).backgroundColor"),'rgb(28, 28, 28)');
  await delay(250);fs.writeFileSync(path.join(os.tmpdir(),'gfot-theme-dark-task.png'),(await win.webContents.capturePage()).toPNG());
  await js("document.querySelector('#prompt').value='';document.querySelector('[data-theme-choice=light]').click()");await until("document.documentElement.dataset.theme==='light'");
 
