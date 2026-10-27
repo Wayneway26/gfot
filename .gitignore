@@ -4,3 +4,6 @@ node_modules/
 .DS_Store
 .README.md
 dist/
+
+desktop/runtime/dsh/node/
+desktop/runtime/dsh/*.tar.gz

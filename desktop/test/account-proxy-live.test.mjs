@@ -1,8 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {randomBytes,generateKeyPairSync,sign} from 'node:crypto';import {mkdtempSync,rmSync,existsSync,readFileSync} from 'node:fs';import {tmpdir} from 'node:os';import {join,resolve} from 'node:path';
 import {jwtPayload} from '../chatgpt-oauth.mjs';
+import {defaultDshRoot} from '../dsh-engine.mjs';
 import {startDesktopServer} from '../backend.mjs';import {codexDocument,token,responseSSE} from './helpers/account-fixture.mjs';
 const binary=resolve('node_modules/opencode-darwin-'+process.arch+'/bin/opencode');const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-for(const source of ['local','managed'])test('real OpenCode '+source+' credential proxy: edit approval and same-session account switch',{skip:!existsSync(binary),timeout:120000},async()=>{
+for(const runtime of ['OpenCode','dsh'])for(const source of ['local','managed'])test('real '+runtime+' '+source+' credential proxy: edit approval and same-session account switch',{skip:!existsSync(binary),timeout:120000},async()=>{
  const dir=mkdtempSync(join(tmpdir(),'gfot-account-execution-')),target=join(dir,'account.txt'),observed=[];let service,permissionSeen=false;const pendingNonces=new Map();const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});const jwk={...publicKey.export({format:'jwk'}),kid:'fixture',use:'sig'};
  const accountFetch=async(url,options)=>{
   if(url.includes('openid-configuration'))return new Response(JSON.stringify({jwks_uri:'https://auth.openai.com/jwks'}));
@@ -17,9 +18,9 @@ for(const source of ['local','managed'])test('real OpenCode '+source+' credentia
   const body=JSON.parse(options.body);observed.push({body,authorization:options.headers.authorization,accountId:options.headers['ChatGPT-Account-Id']||jwtPayload(options.headers.authorization.slice(7)).sub});assert.equal(body.store,false);assert.equal(body.stream,true);assert.equal(body.max_output_tokens,undefined);
   const name=(body.tools||[]).flatMap(t=>t.type==='namespace'?t.tools:[t]).map(t=>t.name).find(n=>['write','apply_patch'].includes(n));
   const toolDone=body.input.some(item=>item.type==='function_call_output');
-  return responseSSE({id:'resp_fixture_'+observed.length,model:body.model,...(!toolDone&&name?{tool:{name,args:name==='write'?{filePath:target,content:'account proxy ok\n'}:{patchText:'*** Begin Patch\n*** Add File: '+target+'\n+account proxy ok\n*** End Patch'}}}:{text:'Synthetic account execution completed.'})});
+  return responseSSE({id:'resp_fixture_'+observed.length,model:body.model,...(!toolDone&&name?{tool:{name,args:name==='write'?{[runtime==='dsh'?'file_path':'filePath']:target,content:'account proxy ok\n'}:{patchText:'*** Begin Patch\n*** Add File: '+target+'\n+account proxy ok\n*** End Patch'}}}:{text:'Synthetic account execution completed.'})});
  };
- try{service=await startDesktopServer({dataDir:join(dir,'appdata'),key:randomBytes(32),binary,accountFetch});
+ try{service=await startDesktopServer({dataDir:join(dir,'appdata'),key:randomBytes(32),binary,...(runtime==='dsh'?{dshRoot:defaultDshRoot}:{}),accountFetch});
   const call=async(route,body)=>{const r=await fetch(service.url+'/api/'+route,{method:body===undefined?'GET':'POST',headers:{authorization:'Bearer '+service.auth,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error);return d;};
   const addAccount=async id=>{
    if(source==='local')return (await call('accounts/import',{document:codexDocument(id),label:'Synthetic account '+id})).accountId;

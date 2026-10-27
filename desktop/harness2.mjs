@@ -84,7 +84,7 @@ export class Harness2Engine{
   }
   this.onPhase({label:message.label,action:message.action,sessions:this.sessions,files:this.snapshot.length});
   const subtask={id:this.task.id+'-h2-'+this.id+'-'+this.sessions,title:'Harness² '+message.label,folder,sessionId:null};
-  const engine=this.current=this.engineFactory({binary:this.binary,dataDir:this.dataDir,task:subtask,profile:this.profile,key:this.key,readOnly:proposer,systemPrompt,maxSteps:16,onEvent:event=>{if(this.current===engine&&!this.cancelled)this.onEvent(event);}});
+  const engine=this.current=this.engineFactory({binary:this.binary,dataDir:this.dataDir,task:subtask,profile:this.profile,key:this.key,readOnly:proposer,isolateWorkspace:true,systemPrompt,maxSteps:16,onEvent:event=>{if(this.current===engine&&!this.cancelled)this.onEvent(event);}});
   const timeout=setTimeout(()=>{this.sessionError='Harness² 单次会话超过 3 分钟';void engine.stop();},180000);
   try{
    await engine.start();if(this.cancelled)throw Error('Stopped');

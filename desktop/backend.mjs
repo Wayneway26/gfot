@@ -10,6 +10,7 @@ import {beginExecution,executionPhase,toolActivity,finishExecution} from './exec
 import {AcpEngine} from './acp-engine.mjs';
 import {DoubaoEngine} from './doubao-engine.mjs';
 import {createStore,publicState,newTask,profileInput,vault,requireText,InputError} from './state.mjs';
+import {DshEngine,dshBinary,dshVersion} from './dsh-engine.mjs';
 import {OpenCodeEngine} from './engine.mjs';
 import {Harness2Engine,harnessStatus,harnessPrompt,validHarness} from './harness2.mjs';
 import {listModels,verifyConnection} from './connections.mjs';
@@ -18,11 +19,14 @@ import {startAccountProxy,verifyResponses} from './account-proxy.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
 const files={'/':'index.html','/app.js':'app.js','/render.js':'render.js','/quota-view.js':'quota-view.js','/style.css':'style.css','/theme.js':'theme.js','/brand-mark-dark.svg':'brand-mark-dark.svg','/brand-mark.svg':'brand-mark.svg'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
-export async function startDesktopServer({dataDir,binary,key,harnessRunner,connectionFetch=fetch,accountFetch=fetch,agentRegistry,agentAppRoots,doubaoRoot,workspaceObserver=observeWorkspace,doubaoFactory=options=>new DoubaoEngine(options),acpFactory=options=>new AcpEngine(options),engineFactory=options=>new OpenCodeEngine(options)}){
+export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,harnessRunner,connectionFetch=fetch,accountFetch=fetch,agentRegistry,agentAppRoots,doubaoRoot,workspaceObserver=observeWorkspace,doubaoFactory=options=>new DoubaoEngine(options),acpFactory=options=>new AcpEngine(options),dshFactory=options=>new DshEngine({...options,dshRoot,nodeBinary:nodeBinary||process.execPath}),engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;const switches=new Map(),reservations=new Set();
  const occupiedSlots=()=>active.size+[...reservations].filter(id=>!active.has(id)).length;
  const state=storage.state;
- const agents=agentRegistry||createAgentRegistry({bundledBinary:binary,...(agentAppRoots?{appRoots:agentAppRoots}:{})});
+ const agents=agentRegistry||createAgentRegistry({bundledBinary:binary,dshRuntime:dshRoot?dshBinary(dshRoot):undefined,...(agentAppRoots?{appRoots:agentAppRoots}:{})});
+ const defaultAgentId=dshRoot?'dsh':'opencode';
+ const isBuiltin=id=>['dsh','opencode'].includes(id);
+ const factoryFor=id=>id==='dsh'?dshFactory:engineFactory;
  const checking=new Map(),nativeLogins=new Map();
  const accounts=createAccountManager({state,vault:secrets,save:storage.save,changed:()=>changed(),credentialsChanged:id=>{accountProxy.revokeAccount(id);for(const p of state.profiles)if(p.accountId===id)delete p.verification;},fetchImpl:accountFetch});
  const accountProxy=await startAccountProxy({accounts,fetchImpl:accountFetch});
@@ -31,7 +35,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
   const redact=v=>typeof v==='string'?values.reduce((text,secret)=>text.split(secret).join('[redacted]'),v):Array.isArray(v)?v.map(redact):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,item])=>[k,redact(item)])):v;
   return redact(value);
  };
- const view=()=>({...publicState(state),agents:agents.list().map(a=>({...a,check:state.agentChecks?.[a.id],login:[...nativeLogins.values()].find(l=>l.agentId===a.id)?.public})),engine:{name:'OpenCode',bundled:!!binary,version:'1.19.3'},harness2:{integrated:true,...harnessStatus(harnessRunner)},capabilities:{agentSwitching:true,sharedProjectContext:true,dynamicContinuation:true,automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
+ const view=()=>({...publicState(state),agents:agents.list().map(a=>({...a,check:state.agentChecks?.[a.id],login:[...nativeLogins.values()].find(l=>l.agentId===a.id)?.public})),engine:{name:dshRoot?'dsh':'OpenCode',defaultAgentId,bundled:!!dshRoot||!!binary,version:dshRoot?dshVersion:'1.19.3'},harness2:{integrated:true,...harnessStatus(harnessRunner)},capabilities:{agentSwitching:true,sharedProjectContext:true,dynamicContinuation:true,automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
  function changed(){if(closed)return;for(const client of clients)client.write('event: state\ndata: '+JSON.stringify(view())+'\n\n');clearTimeout(timer);timer=setTimeout(storage.save,80);}
  function addEvent(task,event){task.events.push({...event,at:new Date().toISOString()});task.events=task.events.slice(-150);changed();}
  function onEvent(task,event,runtime){
@@ -48,6 +52,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    task.draft=safe(hidden?runtime.rawDraft.slice(0,-hidden)+'[redacted]':runtime.rawDraft);executionPhase(task,'output');changed();
   };
   if(event.type==='permission.asked'||event.type==='permission.updated'){if(!task.pending.some(p=>p.id===properties.id))task.pending.push({...properties,kind:'permission'});task.status='permission';executionPhase(task,'permission');addEvent(task,{type:'permission',text:'等待批准：'+(properties.permission||properties.type||'工具操作')});}
+  else if(event.type==='gfot.request.cancelled'){task.pending=task.pending.filter(p=>p.id!==properties.id);task.status=task.pending.length?'permission':'running';changed();}
   else if(event.type==='question.asked'){task.pending.push({...properties,kind:'question'});task.status='permission';executionPhase(task,'permission');addEvent(task,{type:'question',text:'执行器需要你的回答'});}
   else if(event.type==='message.part.updated'){
    const part=properties.part;if(!part)return;
@@ -74,7 +79,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    const wasFresh=!engineTask.sessionId;
    if(agent.kind==='builtin'&&profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
-   const engine=runtime.engine=agent.kind==='builtin'?engineFactory({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event,runtime)}):agent.kind==='doubao'?doubaoFactory({root:doubaoRoot,task:engineTask,onEvent:event=>onEvent(task,event,runtime),onSession:sessionId=>{task.sessionId=sessionId;slots[agent.id]={sessionId,cursor:saved.cursor||0};storage.save();}}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event,runtime)});
+   const engine=runtime.engine=agent.kind==='builtin'?factoryFor(agent.id)({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event,runtime)}):agent.kind==='doubao'?doubaoFactory({root:doubaoRoot,task:engineTask,onEvent:event=>onEvent(task,event,runtime),onSession:sessionId=>{task.sessionId=sessionId;slots[agent.id]={sessionId,cursor:saved.cursor||0};storage.save();}}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event,runtime)});
    await engine.start();
    slots[agent.id]={sessionId:engineTask.sessionId,cursor:wasFresh||engine.resumed===false?0:saved.cursor||0};
    task.sessionId=engineTask.sessionId;storage.save();if(runtime.cancelled)return;
@@ -117,7 +122,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
   try{
    if(profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
-   const engine=runtime.engine=new Harness2Engine({binary,dataDir,harnessRunner,task,prompt:text,profile:resolved,key:grant?.key||secrets.open(profile.secret),engineFactory,redact:safe,
+   const engine=runtime.engine=new Harness2Engine({binary,dataDir,harnessRunner,task,prompt:text,profile:resolved,key:grant?.key||secrets.open(profile.secret),engineFactory:factoryFor(task.agentId),redact:safe,
     onEvent:event=>onEvent(task,event,runtime),onPhase:phase=>{if(active.get(task.id)!==runtime||runtime.cancelled||runtime.eventsClosed)return;task.pending=[];task.liveProgress=[];task.draft='';task.status='running';executionPhase(task,'working','提示词优化 · '+phase.label);task.harnessRun.phases.push(phase);task.harnessRun.phase=phase;addEvent(task,{type:'harness2',text:'Harness² · '+phase.label+' · '+(phase.action==='propose'?'提出配置':'副本探测')});}});
    await engine.start();if(runtime.cancelled)return;const result=safe(await engine.send());if(runtime.cancelled)return;
    task.harnessRun={...task.harnessRun,status:result.successful?'ready':'failed',result,completedAt:new Date().toISOString()};
@@ -268,7 +273,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    if(projectMatch){const project=state.projects.find(p=>p.id===projectMatch[1]);if(!project)throw new InputError('项目不存在');if(state.tasks.some(t=>t.projectId===project.id&&(active.has(t.id)||switches.has(t.id))))throw new InputError('请先结束本项目的执行或交接');if(typeof input.text!=='string'||input.text.length>8000)throw new InputError('项目记忆最多 8000 字符');project.notes=safe(input.text);storage.save();changed();return send(200,view());}
    if(path==='/api/tasks'){
     let folder;try{folder=realpathSync(requireText(input.folder,'项目目录',4096));if(!statSync(folder).isDirectory())throw Error();}catch{throw new InputError('项目目录不存在或不可访问');}
-    const agent=agents.get(input.agentId||'opencode');if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');
+    const agent=agents.get(input.agentId||defaultAgentId);if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');
     if(agent.requiresProfile!==false&&agent.kind==='builtin'&&!state.profiles.some(p=>p.id===input.profileId))throw new InputError('请先配置并选择模型连接');
     const task=newTask(input,folder);task.projectId=ensureProject(state,folder).id;task.agentId=agent.id;task.agentSessions={};task.contextNotes='';state.tasks.unshift(task);storage.save();changed();return send(200,{taskId:task.id});
    }
@@ -289,7 +294,7 @@ export async function startDesktopServer({dataDir,binary,key,harnessRunner,conne
    }
    if(match[2]==='harness-clear'){if(runtime)throw new InputError('请先停止执行');delete task.adoptedHarness;storage.save();changed();return send(200,view());}
    if(match[2]==='harness'){
-    if((task.agentId||'opencode')!=='opencode')throw new InputError('Harness² 副本探测请先选择内置 OpenCode 和模型连接；采用后的指令可用于其他 Agent');
+    if(!isBuiltin(task.agentId||defaultAgentId))throw new InputError('Harness² 副本探测请先选择内置 dsh 或 OpenCode 和模型连接；采用后的指令可用于其他 Agent');
     if(runtime||occupiedSlots()>=2)throw new InputError('请等待当前执行结束');if(input.consent!==true)throw new InputError('请确认副本探测和最多 10 次模型会话');
     const status=harnessStatus(harnessRunner);if(!status.available)throw new InputError(status.reason);
     const text=requireText(input.text,'优化任务'),profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(!profile)throw new InputError('请选择连接');

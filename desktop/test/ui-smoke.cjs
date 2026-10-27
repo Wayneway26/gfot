@@ -6,6 +6,7 @@ const resources=process.env.GFOT_QA_RESOURCES;
 if(resources){Object.defineProperty(app,'isPackaged',{value:true});Object.defineProperty(process,'resourcesPath',{value:resources});}
 app.setPath('userData',path.join(dir,'appdata'));
 const report=process.env.GFOT_QA_REPORT||path.join(os.tmpdir(),'gfot-ui-smoke.json');
+dialog.showErrorBox=(title,message)=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:title+': '+message}));app.exit(1);};
 const models=[],requestBodies=[];let diagnostics=0;
 const appsDir=path.join(dir,'apps'),localCli=path.join(appsDir,'OpenCode.app/Contents/Resources/opencode-cli');
 fs.mkdirSync(path.dirname(localCli),{recursive:true});
@@ -23,14 +24,18 @@ const gateway=http.createServer(async(req,res)=>{
  if(req.url==='/v1/models'){res.setHeader('content-type','application/json');return res.end(JSON.stringify({data:[{id:'alpha'},{id:'beta'}]}));}
  const chunks=[];for await(const c of req)chunks.push(c);const body=JSON.parse(Buffer.concat(chunks).toString());
  if(body.stream===false){diagnostics++;res.setHeader('content-type','application/json');return res.end(JSON.stringify({choices:[{message:body.tools?{role:'assistant',tool_calls:[{id:'diagnostic-1',type:'function',function:{name:'gfot_connection_probe',arguments:'{"ok":true}'}}]}:{role:'assistant',content:'Diagnostic completed'}}]}));}
- const requestText=JSON.stringify(body.messages||[]);requestBodies.push(requestText);
+ const requestText=JSON.stringify(body.messages||[]);requestBodies.push(requestText);models.push(body.model);
+ if(requestText.includes('Synthetic first turn')&&!(body.messages||[]).some(m=>m.role==='tool')){
+  const delta={tool_calls:[{index:0,id:'native-dsh-write',type:'function',function:{name:'write',arguments:JSON.stringify({file_path:path.join(projectDir,'dsh-output.txt'),content:'Synthetic dsh tool output'})}}]};
+  res.writeHead(200,{'content-type':'text/event-stream'});return res.end('data: '+JSON.stringify({id:'dsh-ui-tool',object:'chat.completion.chunk',model:body.model,choices:[{index:0,delta,finish_reason:'tool_calls'}]})+'\n\ndata: [DONE]\n\n');
+ }
  const content=requestText.includes('GFOT OUTPUT CONTRACT')?JSON.stringify({harness:{'systemprompt.md':'H2_FIXTURE_ADOPTED: inspect source and verify results.','guardrails.md':'Respect approval requests. Never access the original project from a copy.','LongTermMEMORY.md':'Use observed task evidence.','tool_descriptions/tool_guidance.md':'Read relevant files and report checks.'},notes:'Synthetic evidence only; no claim of real-provider quality improvement.'}):'Synthetic local UI test completed.';
- models.push(body.model);res.writeHead(200,{'content-type':'text/event-stream'});res.end('data: '+JSON.stringify({id:'synthetic',object:'chat.completion.chunk',model:body.model,choices:[{index:0,delta:{content},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n');
+ res.writeHead(200,{'content-type':'text/event-stream'});res.end('data: '+JSON.stringify({id:'synthetic',object:'chat.completion.chunk',model:body.model,choices:[{index:0,delta:{content},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n');
 });
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThrottling(false);win.webContents.once('did-finish-load',async()=>{try{
  const js=source=>win.webContents.executeJavaScript(source);
- const until=async expression=>{for(let i=0;i<1000;i++){const value=await js(expression);if(value)return value;await delay(50);}throw Error('UI condition timed out: '+expression);};
+ const until=async expression=>{fs.appendFileSync(report+'.steps',expression+'\n');for(let i=0;i<1000;i++){const value=await js(expression);if(value)return value;await delay(50);}throw Error('UI condition timed out: '+expression);};
  const chooseAgent=async(id,resume=false)=>{await js(`document.querySelector('#agent-select').value=${JSON.stringify(id)};document.querySelector('#agent-select').dispatchEvent(new Event('change'))`);await until("!!document.querySelector('#modal-form')?.elements.agentId");await js(`document.querySelector('#modal-form').elements.resume.checked=${resume};document.querySelector('#modal-form').requestSubmit()`);await until("!document.querySelector('#dialog').open");};
  const api=async(route,body)=>js(`fetch('/api/${route}',{method:'${body===undefined?'GET':'POST'}',headers:{'content-type':'application/json'},body:${body===undefined?'undefined':JSON.stringify(JSON.stringify(body))}}).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);return data;})`);
  await until("document.body.innerText.includes('今天，想做点什么')");
@@ -99,7 +104,12 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  await until(`!!document.querySelector('[data-task="${taskId}"]')`);
  await js(`document.querySelector('[data-task="${taskId}"]').click()`);
  await js("document.querySelector('#prompt').value='Synthetic first turn';document.querySelector('#composer').requestSubmit()");
+ await until("!!document.querySelector('[data-permission][data-reply=once]')");
+ assert.equal(fs.existsSync(path.join(projectDir,'dsh-output.txt')),false,'native dsh write waits for host approval');
+ assert.ok(await js("document.querySelector('#approvals').innerText.includes('dsh-output.txt')"),'approval exposes exact native tool arguments');
+ await js("document.querySelector('[data-permission][data-reply=once]').click()");
  await until("document.querySelector('#status').textContent==='等待任务' && document.querySelector('#messages').innerText.includes('Synthetic local UI test completed.')");
+ assert.equal(fs.readFileSync(path.join(projectDir,'dsh-output.txt'),'utf8'),'Synthetic dsh tool output');
  await js(`document.querySelector('#profile-select').value='${two.id}'`);
  await api('profiles',{label:'Synthetic Gamma',baseURL,model:'gamma'});
  await until("document.querySelector('#profile-select').options.length===3");
@@ -113,8 +123,8 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  await js(`document.querySelector('#recent-tasks [data-task="${taskId}"]').click()`);
  assert.equal(await js("document.querySelector('#workspace').hidden"),false);
  assert.ok((await js("document.querySelector('#messages').innerText")).includes('Synthetic second turn'));
- assert.deepEqual(models,['alpha','beta']);
- const state=await api('state');assert.equal(state.tasks[0].messages.length,4);
+ assert.deepEqual(models,['alpha','alpha','beta']);
+ const state=await api('state');assert.equal(state.engine.name,'dsh');assert.equal(state.tasks[0].agentId,'dsh');assert.equal(state.tasks[0].messages.length,4);
  await js("document.querySelector('#settings').click()");assert.equal(await js("document.querySelector('#dialog').open"),true);await js("document.querySelector('#settings-close').click()");
  win.setSize(840,600);await delay(200);
  const compact=await js(`({viewport:innerWidth,body:document.documentElement.scrollWidth,send:document.querySelector('#composer button[type=submit]').getBoundingClientRect().right})`);
@@ -146,7 +156,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  await js("document.querySelector('[data-reply=once]').click()");
  await until("document.querySelector('#status').textContent==='等待任务' && document.querySelector('#messages').innerText.includes('豆包 synthetic native turn completed')");
  assert.equal((await api('state')).tasks[0].messages.length,8);
- await chooseAgent('opencode');
+ await chooseAgent('dsh');
  await until("!document.querySelector('#profile-select').hidden");
  const beforeH2=await api('state');assert.equal(beforeH2.harness2.available,true,'UI H2 test requires Python 3.12/3.13');
  await js("document.querySelector('#h2-optimize').click();document.querySelector('#modal-form').elements.text.value='Explain the fixture; do not modify files.';document.querySelector('#modal-form input[type=checkbox]').checked=true;document.querySelector('#modal-form').requestSubmit()");
@@ -195,7 +205,7 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-dynamic-switch.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-harness2.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-task.png'),(await win.webContents.capturePage()).toPNG());
- fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['light/dark/system themes: native persistence, reload, system changes, dark sheets and preserved task draft/history','workspace redesign: home/recent-task navigation, retained conversation and compact composer','account usage panel: manual refresh, cached windows and failure states (synthetic transport)','real Harness2 core with real OpenCode: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','two real OpenCode model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','approved relay mark served from source/packaged resources and loaded','840px composer stays within viewport','screenshot']},null,2));
+ fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['light/dark/system themes: native persistence, reload, system changes, dark sheets and preserved task draft/history','workspace redesign: home/recent-task navigation, retained conversation and compact composer','account usage panel: manual refresh, cached windows and failure states (synthetic transport)','real Harness2 core with real dsh: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','real dsh native file tool with visible host approval and two model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','approved relay mark served from source/packaged resources and loaded','840px composer stays within viewport','screenshot']},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({ok:false,error:String(error),stack:error.stack}));gateway.close();app.exit(1);}finally{gateway.close();app.quit();}});});
 require(resources?path.join(resources,'app.asar','desktop','main.cjs'):path.join(__dirname,'..','main.cjs'));
 setTimeout(()=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:'120s timeout'}));app.exit(1);},120000).unref();

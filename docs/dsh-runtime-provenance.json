@@ -1,0 +1,10 @@
+{
+  "dsh": "0.2.1-rc.2",
+  "lockfile": "desktop/runtime/dsh/package-lock.json",
+  "node": {
+    "version": "26.4.0",
+    "url": "https://nodejs.org/dist/v26.4.0/node-v26.4.0-darwin-arm64.tar.gz",
+    "archiveSHA256": "4f4fbcacf6b1ff1a95deedba7bd7b2d79efecaa53a8ecb0530546dc9063fefbc",
+    "binarySHA256": "d23e520f5bcd497bdd0c6a6242356a4fd255abaceba7c3549727caacb936ddae"
+  }
+}

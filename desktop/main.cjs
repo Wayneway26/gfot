@@ -53,10 +53,11 @@ function createWindow(){
 async function boot(){
  const dir=app.getPath('userData');mkdirSync(dir,{recursive:true,mode:0o700});
  appearance=createAppearanceStore(dir);nativeTheme.themeSource=appearance.get();
- const key=masterKey(dir),binary=engineBinary();if(!existsSync(binary))throw Error('内置执行器缺失，请重新安装 gfot。');
+ const key=masterKey(dir),binary=engineBinary(),dshRoot=app.isPackaged?join(process.resourcesPath,'dsh'):join(__dirname,'runtime','dsh'),nodeBinary=join(dshRoot,'node','bin','node');
+ if(!existsSync(binary)||!existsSync(nodeBinary)||!existsSync(join(dshRoot,'node_modules','@deepseek-ai','dsh','lib','bin.js')))throw Error('内置执行器缺失，请重新安装 gfot；源码运行请先执行 npm run runtime:dsh。');
  worker=utilityProcess.fork(join(__dirname,'worker.mjs'),[],{stdio:'pipe',serviceName:'gfot local service'});
  worker.stderr.on('data',()=>{});worker.stdout.on('data',()=>{});
- await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('本地服务启动超时')),15000);worker.on('message',message=>{if(message.type==='ready'){clearTimeout(timeout);base=message.url;worker.auth=message.auth;resolve();}else if(message.type==='failed'){clearTimeout(timeout);reject(Error('无法打开本机数据，请检查数据目录和钥匙串。'));}});worker.once('exit',()=>{clearTimeout(timeout);reject(Error('本地服务已退出'));if(!quitting){dialog.showErrorBox('gfot 服务已停止','请重新打开应用。未完成的任务会标记为中断。');app.quit();}});worker.once('spawn',()=>worker.postMessage({type:'start',dataDir:dir,binary,key,doubaoRoot:app.isPackaged?join(process.resourcesPath,'doubao'):join(__dirname,'vendor','doubao-cli'),harnessRunner:app.isPackaged?join(process.resourcesPath,'harness2','h2-runner.py'):join(__dirname,'h2-runner.py')}));});
+ await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('本地服务启动超时')),15000);worker.on('message',message=>{if(message.type==='ready'){clearTimeout(timeout);base=message.url;worker.auth=message.auth;resolve();}else if(message.type==='failed'){clearTimeout(timeout);reject(Error('无法打开本机数据，请检查数据目录和钥匙串。'));}});worker.once('exit',()=>{clearTimeout(timeout);reject(Error('本地服务已退出'));if(!quitting){dialog.showErrorBox('gfot 服务已停止','请重新打开应用。未完成的任务会标记为中断。');app.quit();}});worker.once('spawn',()=>worker.postMessage({type:'start',dataDir:dir,binary,key,nodeBinary,dshRoot,doubaoRoot:app.isPackaged?join(process.resourcesPath,'doubao'):join(__dirname,'vendor','doubao-cli'),harnessRunner:app.isPackaged?join(process.resourcesPath,'harness2','h2-runner.py'):join(__dirname,'h2-runner.py')}));});
  createWindow();
 }
 const locked=app.requestSingleInstanceLock();
