@@ -34,6 +34,11 @@ ipcMain.handle('gfot:import-codex',async event=>{
  if(result.canceled)return null;const path=result.filePaths[0];if(statSync(path).size>90000)throw Error('凭证文件过大，拒绝导入');
  return serviceCall('accounts/import',{document:readFileSync(path,'utf8')});
 });
+ipcMain.handle('gfot:import-opencode',async event=>{
+ trusted(event);const result=await dialog.showOpenDialog(window,{title:'选择你授权 gfot 读取的 OpenCode auth.json',defaultPath:join(app.getPath('home'),'.local','share','opencode','auth.json'),properties:['openFile','showHiddenFiles'],filters:[{name:'OpenCode JSON credentials',extensions:['json']}]});
+ if(result.canceled)return null;const path=result.filePaths[0];if(!statSync(path).isFile()||statSync(path).size>90000)throw Error('凭证文件过大或不是普通文件');
+ return serviceCall('credentials/opencode/preview',{document:readFileSync(path,'utf8')});
+});
 ipcMain.handle('gfot:agent-login',async(event,id)=>{trusted(event);return serviceCall('agents/login/start',{id});});
 ipcMain.handle('gfot:chatgpt-login',async(event,accountId)=>{
  trusted(event);const result=await serviceCall('accounts/login/start',{...(typeof accountId==='string'?{accountId}:{})});

@@ -38,7 +38,7 @@ OpenCode 使用内置 OpenAI SDK 处理 Responses SSE 与工具调用。gfot 的
 - 系统钥匙串中其他 Agent 私有条目的自动读取。
 - 自动额度检测与故障切换、通用全平台 Token 兑换。
 - 原 Codex / WorkBuddy 聊天记录与内部记忆迁移。
-- Harness² 跨任务经验反思与更深递归；h2 分支已提供任务级 k=1 优化，内层执行器仍为 OpenCode。
+- Harness² 跨任务经验反思与更深递归；h2 分支已提供任务级 k=1 优化，默认内层执行器为 dsh，保留 OpenCode 兼容已有任务。
 
 ## 已验证与未验证
 
@@ -51,3 +51,7 @@ OpenCode 使用内置 OpenAI SDK 处理 Responses SSE 与工具调用。gfot 的
 经用户明确授权，只读取本机 Codex `auth.json` 的访问凭证，在内存中运行 gfot 账号管理和本地代理。通过 Electron Chromium 网络栈使用 macOS 系统代理。成功读取 7 个模型；所选 `gpt-6.1-sol` 完成两次固定 Responses 请求：返回诊断函数调用，再接收函数结果并回答。未发送项目内容，未使用共享刷新凭证，前后哈希确认原文件未变。
 
 诊断修复了两个兼容问题：Node 默认网络不跟随系统代理；Codex 流式响应可能省略 Content-Type。后者仍须收到完整 `response.completed` 才记成功。没有把真实账号用于自动文件编辑，也未以真实第二账号验证切换。自动执行与切换证据来自合成账号测试。
+
+## 0.12 模型来源扩展
+
+内置执行器的 API / 本机服务连接也通过 gfot 本地代理，每轮临时凭证绑定所选模型。新增 OpenCode 旧版 API Key 文件导入，按服务商确认地址；不把 OAuth 条目当成通用 Key。豆包、Qoder、WorkBuddy 的订阅模型接口尚未接入，现有原生执行路径继续单独展示。详见[模型来源与路由](model-routing.md)。

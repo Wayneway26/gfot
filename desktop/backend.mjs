@@ -16,6 +16,9 @@ import {Harness2Engine,harnessStatus,harnessPrompt,validHarness} from './harness
 import {listModels,verifyConnection} from './connections.mjs';
 import {createAccountManager} from './accounts.mjs';
 import {startAccountProxy,verifyResponses} from './account-proxy.mjs';
+import {startModelProxy} from './model-proxy.mjs';
+import {createCredentialImports} from './credential-import.mjs';
+import {modelSources} from './model-sources.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
 const files={'/':'index.html','/app.js':'app.js','/render.js':'render.js','/quota-view.js':'quota-view.js','/style.css':'style.css','/theme.js':'theme.js','/brand-mark-dark.svg':'brand-mark-dark.svg','/brand-mark.svg':'brand-mark.svg'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
@@ -30,12 +33,14 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
  const checking=new Map(),nativeLogins=new Map();
  const accounts=createAccountManager({state,vault:secrets,save:storage.save,changed:()=>changed(),credentialsChanged:id=>{accountProxy.revokeAccount(id);for(const p of state.profiles)if(p.accountId===id)delete p.verification;},fetchImpl:accountFetch});
  const accountProxy=await startAccountProxy({accounts,fetchImpl:accountFetch});
+ const modelProxy=await startModelProxy({fetchImpl:connectionFetch}),credentialImports=createCredentialImports();
+ const grantProfile=profile=>profile.mode==='account'?{...accountProxy.grant(profile.accountId,profile.model),protocol:'responses'}:modelProxy.grant(profile,secrets.open(profile.secret));
  const safe=value=>{
-  const values=[...state.profiles.map(p=>secrets.open(p.secret)),...accounts.sensitiveValues(),...Array.from(active.values(),r=>r.engine?.password),...Array.from(active.values(),r=>r.engine?.key)].filter(Boolean);
+  const values=[...state.profiles.map(p=>secrets.open(p.secret)),...accounts.sensitiveValues(),...Array.from(active.values(),r=>r.engine?.password),...Array.from(active.values(),r=>r.proxyKey),...Array.from(active.values(),r=>r.engine?.key)].filter(Boolean).sort((a,b)=>b.length-a.length);
   const redact=v=>typeof v==='string'?values.reduce((text,secret)=>text.split(secret).join('[redacted]'),v):Array.isArray(v)?v.map(redact):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,item])=>[k,redact(item)])):v;
   return redact(value);
  };
- const view=()=>({...publicState(state),agents:agents.list().map(a=>({...a,check:state.agentChecks?.[a.id],login:[...nativeLogins.values()].find(l=>l.agentId===a.id)?.public})),engine:{name:dshRoot?'dsh':'OpenCode',defaultAgentId,bundled:!!dshRoot||!!binary,version:dshRoot?dshVersion:'1.19.3'},harness2:{integrated:true,...harnessStatus(harnessRunner)},capabilities:{agentSwitching:true,sharedProjectContext:true,dynamicContinuation:true,automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],chatGPTLogin:true}});
+ const view=()=>({...publicState(state),agents:agents.list().map(a=>({...a,check:state.agentChecks?.[a.id],login:[...nativeLogins.values()].find(l=>l.agentId===a.id)?.public})),modelSources:modelSources(agents.list()),engine:{name:dshRoot?'dsh':'OpenCode',defaultAgentId,bundled:!!dshRoot||!!binary,version:dshRoot?dshVersion:'1.19.3'},harness2:{integrated:true,...harnessStatus(harnessRunner)},capabilities:{agentSwitching:true,sharedProjectContext:true,dynamicContinuation:true,automaticFailover:false,quotaQuery:true,quotaSources:['codex-local'],accountImport:['codex-local'],credentialImport:['opencode-api-key'],modelProxy:['chat','responses','anthropic'],chatGPTLogin:true}});
  function changed(){if(closed)return;for(const client of clients)client.write('event: state\ndata: '+JSON.stringify(view())+'\n\n');clearTimeout(timer);timer=setTimeout(storage.save,80);}
  function addEvent(task,event){task.events.push({...event,at:new Date().toISOString()});task.events=task.events.slice(-150);changed();}
  function onEvent(task,event,runtime){
@@ -48,7 +53,11 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
   const selectPart=id=>{const runtime=active.get(task.id);if(!runtime||!id)return;if(runtime.draftPartId&&runtime.draftPartId!==id)boundary();runtime.draftPartId=id;};
   const draft=value=>{
    const runtime=active.get(task.id);if(!runtime)return;runtime.rawDraft=value.slice(-100000);let hidden=0;
-   for(const secret of [...state.profiles.map(p=>secrets.open(p.secret)),runtime.engine?.password,runtime.engine?.key,...accounts.sensitiveValues()].filter(Boolean))for(let n=Math.min(secret.length-1,runtime.rawDraft.length);n>hidden;n--)if(runtime.rawDraft.endsWith(secret.slice(0,n))){hidden=n;break;}
+   const values=[...state.profiles.map(p=>secrets.open(p.secret)),runtime.proxyKey,runtime.engine?.password,runtime.engine?.key,...accounts.sensitiveValues()].filter(Boolean);
+   const completeSuffix=values.reduce((length,secret)=>runtime.rawDraft.endsWith(secret)?Math.max(length,secret.length):length,0);
+   // A full credential can itself end in its own prefix. Mask complete matches
+   // atomically instead of hiding their last character before full redaction.
+   for(const secret of values)for(let n=Math.min(secret.length-1,runtime.rawDraft.length);n>Math.max(hidden,completeSuffix);n--)if(runtime.rawDraft.endsWith(secret.slice(0,n))){hidden=n;break;}
    task.draft=safe(hidden?runtime.rawDraft.slice(0,-hidden)+'[redacted]':runtime.rawDraft);executionPhase(task,'output');changed();
   };
   if(event.type==='permission.asked'||event.type==='permission.updated'){if(!task.pending.some(p=>p.id===properties.id))task.pending.push({...properties,kind:'permission'});task.status='permission';executionPhase(task,'permission');addEvent(task,{type:'permission',text:'等待批准：'+(properties.permission||properties.type||'工具操作')});}
@@ -77,8 +86,8 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
    const saved=slots[agent.id]||(agent.kind==='builtin'&&task.sessionId&&!Object.keys(slots).length?{sessionId:task.sessionId,cursor:task.messages.length-1}:{});
    const engineTask=task;engineTask.sessionId=saved.sessionId||null;
    const wasFresh=!engineTask.sessionId;
-   if(agent.kind==='builtin'&&profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
-   const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
+   if(agent.kind==='builtin')grant=grantProfile(profile);runtime.proxyKey=grant?.key;
+   const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:grant.protocol}:profile;
    const engine=runtime.engine=agent.kind==='builtin'?factoryFor(agent.id)({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event,runtime)}):agent.kind==='doubao'?doubaoFactory({root:doubaoRoot,task:engineTask,onEvent:event=>onEvent(task,event,runtime),onSession:sessionId=>{task.sessionId=sessionId;slots[agent.id]={sessionId,cursor:saved.cursor||0};storage.save();}}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event,runtime)});
    await engine.start();
    slots[agent.id]={sessionId:engineTask.sessionId,cursor:wasFresh||engine.resumed===false?0:saved.cursor||0};
@@ -120,8 +129,8 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
   task.harnessRun={status:'running',runId:randomUUID(),startedAt:new Date().toISOString(),phases:[]};
   const deadline=setTimeout(()=>{runtime.cancelled=true;void runtime.engine?.stop().catch(error=>{task.error=safe(error.message);changed();});},15*60*1000);
   try{
-   if(profile.mode==='account')grant=accountProxy.grant(profile.accountId,profile.model);
-   const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:'responses'}:profile;
+   grant=grantProfile(profile);runtime.proxyKey=grant.key;
+   const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:grant.protocol}:profile;
    const engine=runtime.engine=new Harness2Engine({binary,dataDir,harnessRunner,task,prompt:text,profile:resolved,key:grant?.key||secrets.open(profile.secret),engineFactory:factoryFor(task.agentId),redact:safe,
     onEvent:event=>onEvent(task,event,runtime),onPhase:phase=>{if(active.get(task.id)!==runtime||runtime.cancelled||runtime.eventsClosed)return;task.pending=[];task.liveProgress=[];task.draft='';task.status='running';executionPhase(task,'working','提示词优化 · '+phase.label);task.harnessRun.phases.push(phase);task.harnessRun.phase=phase;addEvent(task,{type:'harness2',text:'Harness² · '+phase.label+' · '+(phase.action==='propose'?'提出配置':'副本探测')});}});
    await engine.start();if(runtime.cancelled)return;const result=safe(await engine.send());if(runtime.cancelled)return;
@@ -129,7 +138,7 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
    task.messages.push({id:randomUUID(),role:'assistant',text:'Harness² 优化'+(result.successful?'完成，配置等待你确认采用。':'未通过，不能采用配置。')+' 原项目未自动写回。'+(result.method?.ledger?' 探测 '+result.method.ledger.R+' 次，配置阶段 '+result.method.ledger.P+' 次。':''),at:new Date().toISOString()});
    task.error=null;
   }catch(error){if(!runtime.cancelled){finalStatus='error';task.error=safe(String(error.message)).slice(0,4000);task.harnessRun.status='failed';addEvent(task,{type:'error',text:task.error});}}
-  finally{runtime.eventsClosed=true;clearTimeout(deadline);await runtime.engine?.stop();grant?.revoke();if(runtime.cancelled)task.harnessRun.status='stopped';task.status=runtime.cancelled?'stopped':finalStatus;finishExecution(task,task.status);task.pending=[];task.liveProgress=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
+  finally{runtime.eventsClosed=true;clearTimeout(deadline);grant?.revoke();try{await runtime.engine?.stop();}catch(error){finalStatus='error';task.error=safe(error.message);}if(runtime.cancelled)task.harnessRun.status='stopped';task.status=runtime.cancelled?'stopped':finalStatus;finishExecution(task,task.status);task.pending=[];task.liveProgress=[];task.draft='';active.delete(task.id);task.updatedAt=new Date().toISOString();storage.save();changed();}
  }
 
  function launch(task,text,profile,agent,{continuation=false}={}){
@@ -239,10 +248,23 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
     if(active.size||switches.size)throw new InputError('请先停止任务，再退出账号');
     accountProxy.revokeAccount(input.id);return send(200,await accounts.signOut(input.id));
    }
+   if(path==='/api/credentials/opencode/preview'){
+    if(!bearer)return send(403,{error:'请通过桌面文件选择导入凭证'});
+    return send(200,credentialImports.preview(input.document));
+   }
+   if(path==='/api/credentials/opencode/discard'){credentialImports.discard(input.id);return send(200,{ok:true});}
+   if(path==='/api/credentials/opencode/import'){
+    if(active.size||switches.size)throw new InputError('请先停止执行，再导入模型连接');
+    if(input.consent!==true)throw new InputError('请确认所选密钥允许发送到填写的模型服务地址');
+    const apiKey=credentialImports.key(input.id,input.provider);
+    const profile=profileInput({...input,apiKey},null,secrets.seal);
+    profile.credentialSource={agent:'opencode',provider:input.provider};
+    state.profiles.push(profile);credentialImports.discard(input.id);storage.save();changed();return send(200,view());
+   }
    if(path==='/api/profiles'){
     if(active.size||switches.size)throw new InputError('请先停止执行，再修改连接设置');
     const existing=input.id?state.profiles.find(p=>p.id===input.id):undefined;if(input.id&&!existing)throw new InputError('连接不存在');
-    const profile=(input.mode||existing?.mode)==='account'?accountProfile(input,existing):profileInput(input,existing,secrets.seal);if(existing){delete existing.verification;Object.assign(existing,profile);}else state.profiles.push(profile);storage.save();changed();return send(200,view());
+    const profile=(input.mode||existing?.mode)==='account'?accountProfile(input,existing):profileInput(input,existing,secrets.seal);if(existing){delete existing.verification;delete existing.credentialSource;Object.assign(existing,profile);}else state.profiles.push(profile);storage.save();changed();return send(200,view());
    }
    if(path==='/api/connections/models'){
     const existing=input.id?state.profiles.find(p=>p.id===input.id):undefined;if(input.id&&!existing)throw new InputError('连接不存在');
@@ -253,14 +275,14 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
     const profile=state.profiles.find(p=>p.id===input.id);if(!profile)throw new InputError('请先保存连接');
     if(path.endsWith('/test'))return send(200,profile.mode==='account'?await accounts.models(profile.accountId):await listModels(profile,secrets.open(profile.secret),connectionFetch));
     if(input.consent!==true)throw new InputError('请先确认：此检查会发送固定诊断消息并可能消耗模型用量，不会读取项目文件');
-    const snapshot=JSON.stringify(profile),target=structuredClone(profile),targetKey=secrets.open(target.secret);
+    const snapshot=JSON.stringify(profile),target=structuredClone(profile);
     let result;
     let diagnosticGrant;
     try{
      if(target.mode==='account'){diagnosticGrant=accountProxy.grant(target.accountId,target.model);result=await verifyResponses({...target,baseURL:diagnosticGrant.baseURL},diagnosticGrant.key);}
-     else if(target.protocol==='responses')result=await verifyResponses(target,targetKey,connectionFetch);
+     else if(target.protocol==='responses'){diagnosticGrant=grantProfile(target);result=await verifyResponses({...target,baseURL:diagnosticGrant.baseURL},diagnosticGrant.key);}
      else if(target.protocol==='anthropic')throw new InputError('Anthropic 连接请通过一次实际任务验证；此处暂不做付费诊断');
-     else result=await verifyConnection(target,targetKey,connectionFetch);
+     else {diagnosticGrant=grantProfile(target);result=await verifyConnection({...target,baseURL:diagnosticGrant.baseURL},diagnosticGrant.key);}
     }catch(error){
      if(JSON.stringify(state.profiles.find(p=>p.id===input.id))===snapshot){profile.verification={at:new Date().toISOString(),inference:false,toolCalling:false};storage.save();changed();}
      throw error;
@@ -313,5 +335,5 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
   }catch(error){send(error instanceof InputError?400:500,{error:error instanceof InputError?error.message:'操作失败：请检查连接和执行器状态'});}
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});origin='http://127.0.0.1:'+server.address().port;
- return {url:origin,auth,state,close:async()=>{closed=true;clearTimeout(timer);await Promise.all([...checking.values()].filter(Boolean).map(e=>e.stop()));await Promise.all([...nativeLogins.values()].map(async l=>{l.public.status='cancelled';await l.engine.stop();}));await Promise.allSettled(Array.from(active.values(),async runtime=>{runtime.cancelled=true;await runtime.engine?.stop();}));await Promise.allSettled(pendingRuns);await Promise.allSettled(switches.values());accounts.close();await accountProxy.close();storage.save();for(const client of clients)client.end();await new Promise(resolve=>server.close(resolve));}};
+ return {url:origin,auth,state,close:async()=>{closed=true;clearTimeout(timer);await Promise.all([...checking.values()].filter(Boolean).map(e=>e.stop()));await Promise.all([...nativeLogins.values()].map(async l=>{l.public.status='cancelled';await l.engine.stop();}));await Promise.allSettled(Array.from(active.values(),async runtime=>{runtime.cancelled=true;await runtime.engine?.stop();}));await Promise.allSettled(pendingRuns);await Promise.allSettled(switches.values());credentialImports.close();accounts.close();await accountProxy.close();await modelProxy.close();storage.save();for(const client of clients)client.end();await new Promise(resolve=>server.close(resolve));}};
 }

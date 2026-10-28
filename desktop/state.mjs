@@ -16,7 +16,7 @@ export function profileInput(input,existing,seal){
  if(existing?.secret&&!input.apiKey&&!input.clearKey&&new URL(existing.baseURL).origin!==url.origin)throw new InputError('更改服务地址后，请重新输入该服务的访问密钥，或选择清除旧密钥');
  const secret=input.apiKey?seal(requireText(input.apiKey,'访问密钥',4096)):input.clearKey?null:existing?.secret||null;
  if(mode==='direct'&&!secret)throw new InputError('请填写该服务的 API Key（订阅登录 Token 不等于 API Key）');
- const profile={id:existing?.id||randomUUID(),label:requireText(input.label,'连接名称',80),mode,baseURL:url.toString().replace(/\/$/,''),model:requireText(input.model,'模型 ID',160),protocol,secret};
+ const profile={...(existing?.credentialSource&&!input.apiKey&&!input.clearKey?{credentialSource:existing.credentialSource}:{}),id:existing?.id||randomUUID(),label:requireText(input.label,'连接名称',80),mode,baseURL:url.toString().replace(/\/$/,''),model:requireText(input.model,'模型 ID',160),protocol,secret};
  if(existing?.verification&&['mode','baseURL','model','secret','protocol'].every(k=>(existing[k]??(k==='mode'?'local':k==='protocol'?'chat':null))===profile[k]))profile.verification=existing.verification;
  return profile;
 }

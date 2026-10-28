@@ -116,3 +116,17 @@ gfot 0.11.0-h2.1 defaults new desktop tasks to pinned DeepSeek Harness 0.2.1-rc.
 144 automated tests passed with zero failures/skips. Syntax checks and final source/packaged Electron workflows passed. These exercise actual dsh model/tool execution using local deterministic models, a native file write blocked until a visible approval with exact arguments, same-session model switching, and real Google Harness² four-probe/three-stage refinement plus explicit prompt adoption. dsh tests independently cover native questions, approval rejection, stop, immutable read-only editors, and absolute/symlink/search read boundaries. Both local-import and managed-login Codex proxy paths passed with actual dsh and synthetic accounts, including exact-session account switching and prior-history delivery. No real accounts or paid model calls were used.
 
 Two-axis review fixed hidden operation details and unapproved external reads. Follow-up reported zero remaining findings; both reviewers independently reran the three dsh regression tests. A real temporary bash `sleep 60` process was independently confirmed gone after stop. These checks do not claim complete confinement of approved commands, arbitrary subscription-token compatibility or native shell-state restoration. The macOS arm64 package remains unsigned/unnotarized. [Packaged report](dsh-ui-check.json) · [Review](dsh-integration-review.md) · [Integration](dsh-integration.md) · [Runtime provenance](dsh-runtime-provenance.json).
+
+
+## 2026-10-28 · 0.12 model-source routing
+
+- `npm run check`: passed.
+- `npm test`: 156 passed, 0 failed, 0 skipped. All provider credentials and model responses were synthetic.
+- Real bundled dsh exercised Responses and Anthropic SDKs through gfot's local relay, approved a native file write, then changed imported API key/model while preserving the exact native session and prior task context. Chat Completions execution, approvals and Harness² also passed Electron UI checks.
+- Protocol relay checks cover three formats, native Anthropic beta query/header handling, upstream root normalization, rejected browser origins, authentication/model/path checks, quota/auth errors without retries, and active-request revocation.
+- Credential import checks cover a selected legacy OpenCode JSON file, secret-free preview, rejected OAuth/command entries, destination consent, encrypted storage, source preservation and expired/consumed tickets. Modern OpenCode SQLite storage is not supported by this importer.
+- Deterministic streaming redaction regression covers a complete credential ending in its own prefix; overlapping short/temporary keys remain masked and approval IDs remain intact.
+- Source Electron UI and final packaged-resource UI passed. Native file selection was simulated with synthetic files; production IPC, file parsing, sealing and renderer were real. Final report: [model-routing-ui-check.json](model-routing-ui-check.json).
+- macOS arm64 zip built using installed Electron 44.9.0 (`npm run dist:mac -- --config.electronDist=/Users/wayne/gfot/node_modules/electron/dist`). No signing or public release was performed.
+- Independent Standards and Spec reviews have no remaining findings. The Anthropic SDK routing issue and stale QA report issue were fixed before delivery; Standards also reviewed the deterministic redaction fix.
+- No real account inference or paid quota was used in this delivery. Doubao/WorkBuddy native adapters remain separate execution paths; their subscription model endpoints and Qoder model access remain unverified.

@@ -10,6 +10,7 @@ const definitions=[
  {id:'workbuddy',name:'WorkBuddy',app:'WorkBuddy.app',cli:'Contents/Resources/app.asar.unpacked/cli/bin/codebuddy',kind:'acp',description:'使用 WorkBuddy CLI 的登录与默认模型'},
  {id:'workbuddy-ai',name:'WorkBuddy AI',app:'WorkBuddy AI.app',cli:'Contents/Resources/app.asar.unpacked/cli/bin/codebuddy',kind:'acp',description:'使用 WorkBuddy AI CLI 的登录与默认模型'},
  {id:'doubao',name:'豆包工作',app:'Doubao.app',kind:'doubao',description:'实验接入 · 本机调试接口 · 每轮授权原生工具执行'},
+ {id:'qoder',name:'Qoder',app:'Qoder.app',kind:'unavailable',description:'尚无已验证的模型额度接口或本机执行适配'},
  {id:'qianwen',name:'千问办公',app:'Qianwen.app',kind:'unavailable',description:'尚无已验证的本机执行接口'},
 ];
 const executable=p=>{try{return statSync(p).isFile();}catch{return false;}};

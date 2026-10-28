@@ -41,9 +41,12 @@ Light, dark and system appearance are available from the sidebar. Your preferenc
 | Connection | Configuration |
 | --- | --- |
 | **Codex local login** | Import a selected `auth.json` file. Access credentials are copied into encrypted local storage. |
+| **OpenCode API credentials** | Import an API-key entry from a selected legacy `auth.json`, then confirm its endpoint, protocol and model. |
 | **Model APIs** | Configure an endpoint and API key using Chat Completions, Responses or Anthropic protocols. |
 | **Local models** | Connect Ollama or another compatible service on the local machine. |
 | **Local proxies** | Connect a compatible proxy endpoint, including routes configured in CC Switch. |
+
+Built-in execution routes model requests through a local proxy; upstream credentials stay in the host and the executor receives a temporary access key. OpenCode imports use the underlying provider’s allowance. Doubao and WorkBuddy currently use native execution adapters; their subscription model endpoints and Qoder model access are not yet integrated.
 
 Codex credential import is experimental. Connections use your existing service access and account allowance. See [accounts and authentication](docs/accounts.md) for compatibility details.
 
@@ -101,7 +104,7 @@ Credentials are encrypted locally with a master key protected by macOS Keychain.
 
 ## Documentation
 
-[dsh engine](docs/dsh-integration.md) · [Local Agents](docs/local-agents.md) · [Desktop guide](docs/desktop-preview.md) · [Accounts and proxies](docs/accounts.md) · [Harness² integration](docs/h2-integration.md) · [Verification](docs/verification.md)
+[dsh engine](docs/dsh-integration.md) · [Local Agents](docs/local-agents.md) · [Desktop guide](docs/desktop-preview.md) · [Accounts and proxies](docs/accounts.md) · [Model-source routing](docs/model-routing.md) · [Harness² integration](docs/h2-integration.md) · [Verification](docs/verification.md)
 
 ## Contributing
 

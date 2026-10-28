@@ -6,19 +6,22 @@ const resources=process.env.GFOT_QA_RESOURCES;
 if(resources){Object.defineProperty(app,'isPackaged',{value:true});Object.defineProperty(process,'resourcesPath',{value:resources});}
 app.setPath('userData',path.join(dir,'appdata'));
 const report=process.env.GFOT_QA_REPORT||path.join(os.tmpdir(),'gfot-ui-smoke.json');
-dialog.showErrorBox=(title,message)=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:title+': '+message}));app.exit(1);};
+for(const suffix of ['', '.steps', '.worker-log'])fs.rmSync(report+suffix,{force:true});
+dialog.showErrorBox=(title,message)=>{if(!fs.existsSync(report))fs.writeFileSync(report,JSON.stringify({ok:false,error:title+': '+message}));app.exit(1);};
 const models=[],requestBodies=[];let diagnostics=0;
 const appsDir=path.join(dir,'apps'),localCli=path.join(appsDir,'OpenCode.app/Contents/Resources/opencode-cli');
 fs.mkdirSync(path.dirname(localCli),{recursive:true});
 fs.writeFileSync(localCli,'#!/usr/bin/env node\n'+fs.readFileSync(path.join(__dirname,'helpers/acp-fixture.mjs'),'utf8'),{mode:0o700});
 fs.mkdirSync(path.join(appsDir,'Doubao.app'));
 const originalFork=utilityProcess.fork.bind(utilityProcess);
-utilityProcess.fork=(...args)=>{const worker=originalFork(...args),post=worker.postMessage.bind(worker);worker.postMessage=message=>post(message.type==='start'?{...message,agentAppRoots:[appsDir],doubaoRoot:path.join(__dirname,'helpers/doubao-sdk')}:message);return worker;};
+utilityProcess.fork=(...args)=>{const worker=originalFork(...args),post=worker.postMessage.bind(worker);worker.stderr?.on('data',chunk=>fs.appendFileSync(report+'.worker-log',chunk));worker.postMessage=message=>post(message.type==='start'?{...message,agentAppRoots:[appsDir],doubaoRoot:path.join(__dirname,'helpers/doubao-sdk')}:message);return worker;};
 const projectDir=path.join(dir,'project');fs.mkdirSync(projectDir);fs.writeFileSync(path.join(projectDir,'fixture.txt'),'Synthetic project source');
 const fixtureAuth=path.join(dir,'synthetic-codex-auth.json');
 const fixtureAccess='eyJhbGciOiJSUzI1NiJ9.'+Buffer.from(JSON.stringify({iss:'https://auth.openai.com',sub:'native-import-test',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.fixture-signature';
 fs.writeFileSync(fixtureAuth,JSON.stringify({tokens:{access_token:fixtureAccess,account_id:'native-test-account',refresh_token:'do-not-copy'}}),{mode:0o600});
-dialog.showOpenDialog=async()=>({canceled:false,filePaths:[fixtureAuth]}); // Simulated OS file choice only; production IPC and file read remain real.
+const fixtureOpenCode=path.join(dir,'synthetic-opencode-auth.json');
+fs.writeFileSync(fixtureOpenCode,JSON.stringify({fixture:{type:'api',key:'synthetic-opencode-ui-key'},openai:{type:'oauth',access:'do-not-copy-oauth'}}),{mode:0o600});
+dialog.showOpenDialog=async(_window,options)=>({canceled:false,filePaths:[options.title.includes('OpenCode')?fixtureOpenCode:fixtureAuth]}); // Simulated OS file choice only; production IPC and file read remain real.
 
 const gateway=http.createServer(async(req,res)=>{
  if(req.url==='/v1/models'){res.setHeader('content-type','application/json');return res.end(JSON.stringify({data:[{id:'alpha'},{id:'beta'}]}));}
@@ -205,7 +208,19 @@ app.on('browser-window-created',(_event,win)=>{win.webContents.setBackgroundThro
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-dynamic-switch.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-harness2.png'),(await win.webContents.capturePage()).toPNG());
  fs.writeFileSync(path.join(os.tmpdir(),'gfot-desktop-task.png'),(await win.webContents.capturePage()).toPNG());
- fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['light/dark/system themes: native persistence, reload, system changes, dark sheets and preserved task draft/history','workspace redesign: home/recent-task navigation, retained conversation and compact composer','account usage panel: manual refresh, cached windows and failure states (synthetic transport)','real Harness2 core with real dsh: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','real dsh native file tool with visible host approval and two model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','approved relay mark served from source/packaged resources and loaded','840px composer stays within viewport','screenshot']},null,2));
+ // Native file selection is simulated, but IPC, secret parsing/sealing and UI are real.
+ await js("document.querySelector('#settings').click()");
+ for(const name of ['Codex','OpenCode','豆包工作','Qoder','WorkBuddy'])assert.ok((await js("document.querySelector('#dialog-body').innerText")).includes(name));
+ fs.writeFileSync(path.join(os.tmpdir(),'gfot-model-sources.png'),(await win.webContents.capturePage()).toPNG());
+ await js("document.querySelector('#import-opencode').click()");await until("!!document.querySelector('#modal-form')?.elements.provider");
+ assert.ok((await js("document.querySelector('#dialog-body').innerText")).includes('OAuth 登录需对应平台适配'));
+ assert.ok(!(await js("document.documentElement.outerHTML")).includes('synthetic-opencode-ui-key'));
+ await js(`(()=>{const form=document.querySelector('#modal-form');form.elements.mode.value='local';form.elements.baseURL.value=${JSON.stringify(baseURL)};form.elements.model.value='alpha';form.elements.label.value='Imported OpenCode';form.elements.consent.checked=true;form.requestSubmit();})()`);
+ await until("!document.querySelector('#dialog').open");
+ const importedKeyProfile=(await api('state')).profiles.find(p=>p.label==='Imported OpenCode');assert.deepEqual(importedKeyProfile.credentialSource,{agent:'opencode',provider:'fixture'});assert.ok(!JSON.stringify(await api('state')).includes('synthetic-opencode-ui-key'));
+ assert.ok(!fs.readFileSync(path.join(dir,'appdata/desktop.json'),'utf8').includes('synthetic-opencode-ui-key'));
+ assert.equal(JSON.parse(fs.readFileSync(fixtureOpenCode,'utf8')).fixture.key,'synthetic-opencode-ui-key','source credential file unchanged');
+ fs.writeFileSync(report,JSON.stringify({ok:true,packagedResources:!!resources,models,diagnostics,checks:['OpenCode native credential import: secret-free preview, OAuth rejected, chosen key encrypted, source unchanged','model-source catalogue distinguishes subscription model access from native executors','light/dark/system themes: native persistence, reload, system changes, dark sheets and preserved task draft/history','workspace redesign: home/recent-task navigation, retained conversation and compact composer','account usage panel: manual refresh, cached windows and failure states (synthetic transport)','real Harness2 core with real dsh: 4 probes and 3 proposal stages','explicit harness adoption reaches next normal execution','source fixture unchanged by H2','Codex import IPC with simulated file choice','credentials absent from renderer state','model discovery via setup form','explicit diagnostic consent','inference and tool-result verification','sandboxed renderer','native folder IPC bridge','profile selection survives connection edit','real dsh native file tool with visible host approval and two model turns in same conversation','settings dialog','native ACP executor switching with approval','shared task notes','project memory and grouped task sidebar','quota signal to switch-and-continue in the same task','visible checkpoint with tool evidence and context budget','thinking and file-tool status with elapsed time','private thought content excluded','collapsed progress and formatted final answer','code block copied through native clipboard','optional task details panel','Doubao native-turn authorization and executor switching (synthetic transport)','inspectable Harness2 optimized prompt','approved relay mark served from source/packaged resources and loaded','840px composer stays within viewport','screenshot']},null,2));
  }catch(error){fs.writeFileSync(report,JSON.stringify({ok:false,error:String(error),stack:error.stack}));gateway.close();app.exit(1);}finally{gateway.close();app.quit();}});});
 require(resources?path.join(resources,'app.asar','desktop','main.cjs'):path.join(__dirname,'..','main.cjs'));
 setTimeout(()=>{fs.writeFileSync(report,JSON.stringify({ok:false,error:'120s timeout'}));app.exit(1);},120000).unref();

@@ -1,8 +1,8 @@
 # Local Agent execution
 
-The desktop client has three execution paths:
+The desktop client separates model-source routing from native execution. See [model sources](model-routing.md). Execution paths:
 
-- **Bundled OpenCode** uses gfot model/account profiles and the local HTTP/SSE adapter.
+- **Bundled dsh (default) and OpenCode** use gfot model/account profiles and the local HTTP/SSE adapter.
 - **Local ACP Agents** run the installed application's CLI as a supervised child process. Authentication and the default model belong to that Agent. gfot does not copy its tokens or private chat database.
 
 - **Doubao desktop (experimental)** uses an authorized loopback CDP connection to the running app. The app retains its login and native tool runtime.
@@ -35,7 +35,7 @@ The supervisor owns the CLI and descendants that remain in its process group, an
 
 ## Harness² prompt refinement
 
-**提示词优化** runs the existing pinned Harness² Propose–Probe–Compose workflow using bundled OpenCode and a gfot model profile. It refines the system prompt, guardrails, task memory and tool guidance. Inspect and copy the resulting system prompt before explicit adoption.
+**提示词优化** runs the existing pinned Harness² Propose–Probe–Compose workflow using the selected bundled dsh or OpenCode executor and a gfot model profile. It refines the system prompt, guardrails, task memory and tool guidance. Inspect and copy the resulting system prompt before explicit adoption.
 
 Adopted instructions apply to subsequent normal turns in that task. For bundled OpenCode they use `agent.build.prompt`; for ACP Agents they are prepended as user-approved task instructions to the prompt. ACP does not provide a portable system-prompt replacement API. This integration does not claim identical system-level control across runtimes. Native ACP Agents are not yet used for the optimization probes themselves.
 

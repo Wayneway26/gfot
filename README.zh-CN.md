@@ -41,9 +41,12 @@ gfot 用于管理本地项目中的 AI 编程任务，将项目目录、任务�
 | 接入方式 | 配置方式 |
 | --- | --- |
 | **Codex 本地登录** | 导入选定的 `auth.json`，将访问凭证副本加密保存在本机。 |
+| **OpenCode API 凭证** | 从选定的旧版 `auth.json` 导入 API Key 条目，确认对应服务地址、协议与模型。 |
 | **模型 API** | 配置接口地址与 API Key，支持 Chat Completions、Responses 和 Anthropic 协议。 |
 | **本机模型** | 连接 Ollama 或运行在本机的其他兼容服务。 |
 | **本地代理** | 连接兼容代理地址，包括通过 CC Switch 配置的路由。 |
+
+内置执行器通过本地代理请求模型，上游凭证留在宿主服务，执行器使用每轮临时访问密钥。OpenCode 导入使用其底层服务商的额度。豆包与 WorkBuddy 当前提供原生执行适配，其订阅模型接口和 Qoder 模型接入尚未完成。
 
 Codex 凭证导入为实验功能。各项连接使用已有服务权限与账号额度，兼容性说明见[账号与认证](docs/accounts.md)。
 
@@ -101,7 +104,7 @@ npm run dist:mac
 
 ## 文档
 
-[dsh 执行引擎](docs/dsh-integration.md) · [本地 Agent](docs/local-agents.md) · [桌面版指南](docs/desktop-preview.md) · [账号与代理](docs/accounts.md) · [Harness² 接入](docs/h2-integration.md) · [验证记录](docs/verification.md)
+[dsh 执行引擎](docs/dsh-integration.md) · [本地 Agent](docs/local-agents.md) · [桌面版指南](docs/desktop-preview.md) · [账号与代理](docs/accounts.md) · [模型来源与路由](docs/model-routing.md) · [Harness² 接入](docs/h2-integration.md) · [验证记录](docs/verification.md)
 
 ## 参与贡献
 

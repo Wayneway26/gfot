@@ -26,8 +26,11 @@ export class DshEngine{
   const home=join(this.dataDir,'dsh',this.task.id);mkdirSync(home,{recursive:true,mode:0o700});
   const protocol={chat:'openai-completions',responses:'openai-responses',anthropic:'anthropic-messages'}[this.profile.protocol||'chat'];
   if(!protocol)throw new InputError('dsh 不支持此模型协议');
+  // Anthropic's SDK appends /v1/messages; OpenAI SDKs append /responses or
+  // /chat/completions. Profiles use a /v1 prefix, so normalize only Anthropic.
+  const baseURL=protocol==='anthropic-messages'?this.profile.baseURL.replace(/\/v1\/?$/,''):this.profile.baseURL;
   const patch=[
-   {id:'llm-pi-ai',config:{providers:{gfot:{api:protocol,baseURL:this.profile.baseURL,apiKeyEnv:'GFOT_DSH_MODEL_KEY',models:[{id:this.profile.model,contextWindow:64000,maxTokens:8192}],...(protocol==='openai-completions'?{compat:{supportsDeveloperRole:false,maxTokensField:'max_tokens'}}:{})}}}},
+   {id:'llm-pi-ai',config:{providers:{gfot:{api:protocol,baseURL,apiKeyEnv:'GFOT_DSH_MODEL_KEY',models:[{id:this.profile.model,contextWindow:64000,maxTokens:8192}],...(protocol==='openai-completions'?{compat:{supportsDeveloperRole:false,maxTokensField:'max_tokens'}}:{})}}}},
    {id:'llm-deepseek',disabled:true},{id:'llm-deepseek-account',disabled:true},
    {id:'system-prompt',config:{personaPrefix:'You are gfot, a software engineering agent. Inspect the selected project, use tools to complete the task, ask the user when essential information is missing, and verify your changes.'}},
    {id:'sandbox-policy',config:{mode:this.readOnly?'read-only':'workspace-write',workspaceRoot:resolve(this.task.folder)}},
