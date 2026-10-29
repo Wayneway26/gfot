@@ -39,6 +39,10 @@ ipcMain.handle('gfot:import-opencode',async event=>{
  if(result.canceled)return null;const path=result.filePaths[0];if(!statSync(path).isFile()||statSync(path).size>90000)throw Error('凭证文件过大或不是普通文件');
  return serviceCall('credentials/opencode/preview',{document:readFileSync(path,'utf8')});
 });
+ipcMain.handle('gfot:select-claude',async event=>{
+ trusted(event);const candidates=await serviceCall('runtimes/claude/candidates',{});const result=await dialog.showOpenDialog(window,{title:'选择你授权 gfot 运行的 Claude Code 执行文件',defaultPath:candidates.paths[0]||join(app.getPath('home'),'.local/bin/claude'),properties:['openFile','showHiddenFiles']});
+ if(result.canceled)return null;return serviceCall('runtimes/claude/select',{path:result.filePaths[0]});
+});
 ipcMain.handle('gfot:agent-login',async(event,id)=>{trusted(event);return serviceCall('agents/login/start',{id});});
 ipcMain.handle('gfot:chatgpt-login',async(event,accountId)=>{
  trusted(event);const result=await serviceCall('accounts/login/start',{...(typeof accountId==='string'?{accountId}:{})});
@@ -62,7 +66,7 @@ async function boot(){
  if(!existsSync(binary)||!existsSync(nodeBinary)||!existsSync(join(dshRoot,'node_modules','@deepseek-ai','dsh','lib','bin.js')))throw Error('内置执行器缺失，请重新安装 gfot；源码运行请先执行 npm run runtime:dsh。');
  worker=utilityProcess.fork(join(__dirname,'worker.mjs'),[],{stdio:'pipe',serviceName:'gfot local service'});
  worker.stderr.on('data',()=>{});worker.stdout.on('data',()=>{});
- await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('本地服务启动超时')),15000);worker.on('message',message=>{if(message.type==='ready'){clearTimeout(timeout);base=message.url;worker.auth=message.auth;resolve();}else if(message.type==='failed'){clearTimeout(timeout);reject(Error('无法打开本机数据，请检查数据目录和钥匙串。'));}});worker.once('exit',()=>{clearTimeout(timeout);reject(Error('本地服务已退出'));if(!quitting){dialog.showErrorBox('gfot 服务已停止','请重新打开应用。未完成的任务会标记为中断。');app.quit();}});worker.once('spawn',()=>worker.postMessage({type:'start',dataDir:dir,binary,key,nodeBinary,dshRoot,doubaoRoot:app.isPackaged?join(process.resourcesPath,'doubao'):join(__dirname,'vendor','doubao-cli'),harnessRunner:app.isPackaged?join(process.resourcesPath,'harness2','h2-runner.py'):join(__dirname,'h2-runner.py')}));});
+ await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('本地服务启动超时')),15000);worker.on('message',message=>{if(message.type==='ready'){clearTimeout(timeout);base=message.url;worker.auth=message.auth;resolve();}else if(message.type==='failed'){clearTimeout(timeout);reject(Error('无法打开本机数据，请检查数据目录和钥匙串。'));}});worker.once('exit',()=>{clearTimeout(timeout);reject(Error('本地服务已退出'));if(!quitting){dialog.showErrorBox('gfot 服务已停止','请重新打开应用。未完成的任务会标记为中断。');app.quit();}});worker.once('spawn',()=>worker.postMessage({type:'start',dataDir:dir,binary,key,nodeBinary,dshRoot,claudeRoot:app.isPackaged?join(process.resourcesPath,'claude'):join(__dirname,'runtime/claude'),doubaoRoot:app.isPackaged?join(process.resourcesPath,'doubao'):join(__dirname,'vendor','doubao-cli'),harnessRunner:app.isPackaged?join(process.resourcesPath,'harness2','h2-runner.py'):join(__dirname,'h2-runner.py')}));});
  createWindow();
 }
 const locked=app.requestSingleInstanceLock();

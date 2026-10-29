@@ -6,6 +6,7 @@ import {InputError} from './state.mjs';
 const definitions=[
  {id:'dsh',name:'dsh · 内置',kind:'builtin',description:'统一执行引擎 · 使用 gfot 中的账号与模型连接'},
  {id:'opencode',name:'OpenCode · 内置',kind:'builtin',description:'使用 gfot 中配置的账号与模型连接'},
+ {id:'claude',name:'Claude Agent · 本机',kind:'claude',description:'使用你选择的本机 Claude Code 与 gfot 的 Anthropic 连接'},
  {id:'opencode-local',name:'OpenCode · 本机',app:'OpenCode.app',cli:'Contents/Resources/opencode-cli',kind:'acp',description:'使用本机 OpenCode 的登录与默认模型'},
  {id:'workbuddy',name:'WorkBuddy',app:'WorkBuddy.app',cli:'Contents/Resources/app.asar.unpacked/cli/bin/codebuddy',kind:'acp',description:'使用 WorkBuddy CLI 的登录与默认模型'},
  {id:'workbuddy-ai',name:'WorkBuddy AI',app:'WorkBuddy AI.app',cli:'Contents/Resources/app.asar.unpacked/cli/bin/codebuddy',kind:'acp',description:'使用 WorkBuddy AI CLI 的登录与默认模型'},
@@ -14,15 +15,17 @@ const definitions=[
  {id:'qianwen',name:'千问办公',app:'Qianwen.app',kind:'unavailable',description:'尚无已验证的本机执行接口'},
 ];
 const executable=p=>{try{return statSync(p).isFile();}catch{return false;}};
-export function createAgentRegistry({appRoots=['/Applications',join(homedir(),'Applications')],bundledBinary,dshRuntime,nodeBinary=process.execPath}={}){
+export function createAgentRegistry({appRoots=['/Applications',join(homedir(),'Applications')],bundledBinary,dshRuntime,nodeBinary=process.execPath,claudeRuntime=()=>null}={}){
  let agents=[];
  function refresh(){agents=definitions.map(d=>{
   const appPath=d.app?appRoots.map(r=>join(r,d.app)).find(existsSync):undefined;
+  const selected=d.kind==='claude'?claudeRuntime():null;
+  if(d.kind==='claude')return {...d,binary:selected?.path,version:selected?.version,installed:!!selected,available:!!selected?.path&&executable(selected.path)};
   const binary=d.kind==='builtin'?(d.id==='dsh'?dshRuntime:bundledBinary):appPath&&d.cli?join(appPath,d.cli):undefined;
   return {...d,appPath,binary,installed:d.kind==='builtin'?!!binary:!!appPath,available:d.kind==='builtin'?(d.id==='dsh'?!!binary&&existsSync(binary):true):d.kind==='acp'?!!binary&&executable(binary):d.kind==='doubao'?!!appPath:false};
  });return list();}
- const list=()=>agents.map(({binary,appPath,cli,app,...a})=>({...a,transport:a.kind==='acp'?'ACP stdio':a.kind==='builtin'?'HTTP / SSE':a.kind==='doubao'?'本机 CDP（实验）':'外部应用',requiresProfile:a.kind==='builtin',supportsHarness:a.kind==='builtin'}));
- function get(id='opencode'){const a=agents.find(a=>a.id===id);if(!a)throw new InputError('未知 Agent');if(!a.available)throw new InputError(a.installed&&a.kind==='unavailable'?a.name+' 尚无已验证的本机执行接口':a.name+' 未安装或执行入口不可用');return a;}
+ const list=()=>agents.map(({binary,appPath,cli,app,...a})=>({...a,transport:a.kind==='acp'?'ACP stdio':a.kind==='builtin'?'HTTP / SSE':a.kind==='claude'?'Claude Agent SDK':a.kind==='doubao'?'本机 CDP（实验）':'外部应用',requiresProfile:['builtin','claude'].includes(a.kind),supportsHarness:a.kind==='builtin'}));
+ function get(id='opencode'){const a=agents.find(a=>a.id===id);if(!a)throw new InputError('未知 Agent');if(!a.available&&a.kind==='claude')throw new InputError('请先在 Agent 设置中选择可用的 Claude Code 执行文件');if(!a.available)throw new InputError(a.installed&&a.kind==='unavailable'?a.name+' 尚无已验证的本机执行接口':a.name+' 未安装或执行入口不可用');return a;}
  function command(id){const a=get(id);if(a.kind!=='acp')throw new InputError('此 Agent 没有 ACP 执行接口');
   if(id==='opencode-local')return {command:a.binary,args:['acp'],env:{}};
   const cliRoot=join(a.appPath,'Contents/Resources/app.asar.unpacked/cli');

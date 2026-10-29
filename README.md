@@ -29,6 +29,7 @@ gfot is a desktop client for managing AI coding tasks in local projects. Keep pr
 
 - **Project-based tasks.** Select a local folder and keep conversations and execution records with the task.
 - **Local Agent execution.** Use bundled DeepSeek Harness (dsh) as the default execution engine. OpenCode remains available for existing tasks, alongside installed OpenCode, WorkBuddy or WorkBuddy AI CLIs through ACP. An experimental native Doubao desktop adapter is also available. Each local executor uses its own authentication and quota.
+- **Claude Agent.** Select a compatible local Claude Code executable and an Anthropic API connection. Approve tool operations, answer questions and resume the native session in gfot. See [setup and supported version](docs/claude-integration.md).
 - **Your own accounts.** Connect an existing Codex login, API, local model service or compatible proxy to dsh. Change the model or account between turns while retaining the same dsh session. Open Accounts & usage to inspect credential status and supported allowance windows.
 - **Switch and continue.** Retain per-Agent sessions and hand over project memory, task history, tool results and workspace state to continue the same task.
 - **Readable execution.** Follow thinking signals, tool activity and approval requests as they happen. Progress stays collapsed; answers render with headings, lists and copyable code.
@@ -72,6 +73,7 @@ cd gfot
 npm ci
 node node_modules/electron/install.js
 npm run runtime:dsh
+npm run runtime:claude
 npm run desktop
 ```
 
@@ -95,6 +97,7 @@ The `.app` and ZIP are written to `dist/`. Preview builds are unsigned and have 
 | --- | --- |
 | **gfot · Electron / Node.js** | Desktop interface, task persistence, account management, local proxy and approval handling. |
 | **DeepSeek Harness · dsh** | Default Agent Loop, native tools, sessions, subagents and host interaction over stdio JSON-RPC. |
+| **Claude Agent SDK · native Claude Code** | Optional local execution loop, tools and session, with gfot approvals and an isolated configuration. |
 | **Other execution adapters · HTTP / ACP** | Existing OpenCode sessions and installed native Agent CLIs. |
 | **Harness² · Python adapter** | Optional probe, proposal and composition workflow for task-level instruction configurations. |
 
@@ -104,7 +107,7 @@ Credentials are encrypted locally with a master key protected by macOS Keychain.
 
 ## Documentation
 
-[dsh engine](docs/dsh-integration.md) · [Local Agents](docs/local-agents.md) · [Desktop guide](docs/desktop-preview.md) · [Accounts and proxies](docs/accounts.md) · [Model-source routing](docs/model-routing.md) · [Harness² integration](docs/h2-integration.md) · [Verification](docs/verification.md)
+[dsh engine](docs/dsh-integration.md) · [Claude Agent](docs/claude-integration.md) · [Local Agents](docs/local-agents.md) · [Desktop guide](docs/desktop-preview.md) · [Accounts and proxies](docs/accounts.md) · [Model-source routing](docs/model-routing.md) · [Harness² integration](docs/h2-integration.md) · [Verification](docs/verification.md)
 
 ## Contributing
 

@@ -130,3 +130,18 @@ Two-axis review fixed hidden operation details and unapproved external reads. Fo
 - macOS arm64 zip built using installed Electron 44.9.0 (`npm run dist:mac -- --config.electronDist=/Users/wayne/gfot/node_modules/electron/dist`). No signing or public release was performed.
 - Independent Standards and Spec reviews have no remaining findings. The Anthropic SDK routing issue and stale QA report issue were fixed before delivery; Standards also reviewed the deterministic redaction fix.
 - No real account inference or paid quota was used in this delivery. Doubao/WorkBuddy native adapters remain separate execution paths; their subscription model endpoints and Qoder model access remain unverified.
+
+
+## Claude Agent executor — 2026-10-30
+
+gfot **0.13.0-h2.1** adds an optional Claude Agent executor while retaining dsh as the default. The tested pair is **Claude Agent SDK 0.3.312 / Claude Code 2.1.312**. The native executable is test-only and explicitly selected; no native Claude binary is bundled or silently installed.
+
+- Syntax checks and **166 automated tests** passed with zero failures/skips. Native tests used the real pinned executable and a synthetic local Anthropic service.
+- Verified read → host write approval/refusal → actual filesystem change/tool-result return → later turn; questions answered/cancelled; project-external Read and parent-directory Glob refusal; foreground subagent separation; private thinking filtering; exact native session restoration after a host service restart; explicit missing-session failure.
+- A project fixture with auto-allow permissions, startup hooks and a `CLAUDE.md` injection did not load those settings or instructions. Runtime configuration, HOME and sessions are isolated per task. Existing user Claude credentials/configuration were not read or edited.
+- Source and final packaged Claude Electron workflows passed: real main/preload/worker IPC, host-owned model proxy, SDK and native tools; only the OS file choice was simulated. Upstream API keys were absent from renderer state. The package includes the original SDK license and excludes optional native executable packages.
+- Standards review found and verified the fix for stopping during startup. Spec review found and verified the fix for rejected/cancelled tools remaining in a running state. Follow-up hardened Glob traversal approval and child request attribution. Regression assertions cover the fixes.
+
+The existing source and packaged UI regression also passed, including real dsh/Harness² synthetic-model execution, account controls and executor switching. macOS arm64 builds remain unsigned/unnotarized.
+
+This verifies the Anthropic-native execution path, not paid-provider availability or model quality. Codex/GPT and Chat Completions translation remain Issues #2/#3. The SDK remains proprietary under its own terms. See [setup and scope](claude-integration.md) and [machine-readable UI report](claude-ui-check.json).

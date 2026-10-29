@@ -8,6 +8,12 @@ gfot task → dsh → temporary loopback credential → gfot proxy → selected 
              └──────────── model output / tool calls ──────────┘
 ```
 
+## Claude Agent routing
+
+The optional Claude Agent executor uses the same host-owned relay with an **Anthropic Messages** connection. Select a local Claude Code 2.1.312 executable in Agent settings; its SDK adapter is pinned to 0.3.312. The child receives a temporary loopback credential, never the upstream API key. Native session files and configuration are isolated per gfot task.
+
+This path does not yet translate Claude requests into Responses or Chat Completions, and it does not import a claude.ai subscription login. Codex/GPT routing and other cross-protocol services remain separate work. See [Claude setup](claude-integration.md).
+
 ## Source support
 
 | Source | Models for the shared dsh runtime | Native Agent execution |

@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-30",
+  "productVersion": "0.13.0-h2.1",
+  "platform": "macOS arm64",
+  "sdkVersion": "0.3.312",
+  "nativeRuntimeVersion": "2.1.312",
+  "automatedTests": {
+    "passed": 166,
+    "failed": 0,
+    "skipped": 0
+  },
+  "sourceUI": "passed",
+  "packagedClaudeUI": {
+    "ok": true,
+    "packagedResources": true,
+    "checks": [
+      "native executable selection through real IPC with a simulated file picker",
+      "Anthropic-only connection UI",
+      "real Claude SDK and native tool execution through host-owned proxy",
+      "visible write approval before mutation",
+      "native question answered in gfot",
+      "exact session resumed between native processes",
+      "stop cancels pending approval and prevents mutation",
+      "credentials hidden from renderer state",
+      "Harness2 probes remain disabled for Claude",
+      "screenshot"
+    ]
+  },
+  "modelService": "synthetic localhost Anthropic only; no real credentials or paid calls",
+  "packaging": {
+    "sdkLicensePresent": true,
+    "nativeClaudeExecutableBundled": false
+  },
+  "existingSourceUI": "passed",
+  "existingPackagedUI": "passed"
+}

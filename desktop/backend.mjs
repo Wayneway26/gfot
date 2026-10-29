@@ -11,6 +11,8 @@ import {AcpEngine} from './acp-engine.mjs';
 import {DoubaoEngine} from './doubao-engine.mjs';
 import {createStore,publicState,newTask,profileInput,vault,requireText,InputError} from './state.mjs';
 import {DshEngine,dshBinary,dshVersion} from './dsh-engine.mjs';
+import {ClaudeEngine} from './claude-engine.mjs';
+import {inspectClaudeRuntime,claudeCandidates} from './claude-runtime.mjs';
 import {OpenCodeEngine} from './engine.mjs';
 import {Harness2Engine,harnessStatus,harnessPrompt,validHarness} from './harness2.mjs';
 import {listModels,verifyConnection} from './connections.mjs';
@@ -22,12 +24,14 @@ import {modelSources} from './model-sources.mjs';
 const publicDir=fileURLToPath(new URL('./ui/',import.meta.url));
 const files={'/':'index.html','/app.js':'app.js','/render.js':'render.js','/quota-view.js':'quota-view.js','/style.css':'style.css','/theme.js':'theme.js','/brand-mark-dark.svg':'brand-mark-dark.svg','/brand-mark.svg':'brand-mark.svg'};
 const matches=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
-export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,harnessRunner,connectionFetch=fetch,accountFetch=fetch,agentRegistry,agentAppRoots,doubaoRoot,workspaceObserver=observeWorkspace,doubaoFactory=options=>new DoubaoEngine(options),acpFactory=options=>new AcpEngine(options),dshFactory=options=>new DshEngine({...options,dshRoot,nodeBinary:nodeBinary||process.execPath}),engineFactory=options=>new OpenCodeEngine(options)}){
+export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,harnessRunner,claudeRoot,claudeFactory=options=>new ClaudeEngine({...options,claudeRoot}),connectionFetch=fetch,accountFetch=fetch,agentRegistry,agentAppRoots,doubaoRoot,workspaceObserver=observeWorkspace,doubaoFactory=options=>new DoubaoEngine(options),acpFactory=options=>new AcpEngine(options),dshFactory=options=>new DshEngine({...options,dshRoot,nodeBinary:nodeBinary||process.execPath}),engineFactory=options=>new OpenCodeEngine(options)}){
  const storage=createStore(dataDir),secrets=vault(key),clients=new Set(),active=new Map(),pendingRuns=new Set();let timer,closed=false;const switches=new Map(),reservations=new Set();
  const occupiedSlots=()=>active.size+[...reservations].filter(id=>!active.has(id)).length;
  const state=storage.state;
- const agents=agentRegistry||createAgentRegistry({bundledBinary:binary,dshRuntime:dshRoot?dshBinary(dshRoot):undefined,...(agentAppRoots?{appRoots:agentAppRoots}:{})});
+ const agents=agentRegistry||createAgentRegistry({claudeRuntime:()=>state.runtimes?.claude,bundledBinary:binary,dshRuntime:dshRoot?dshBinary(dshRoot):undefined,...(agentAppRoots?{appRoots:agentAppRoots}:{})});
  const defaultAgentId=dshRoot?'dsh':'opencode';
+ const usesConnection=agent=>['builtin','claude'].includes(agent.kind);
+ const validateProfile=(agent,profile)=>{if(usesConnection(agent)&&!profile)throw new InputError('请选择可用的模型连接');if(agent.kind==='claude'&&(profile.mode==='account'||profile.protocol!=='anthropic'))throw new InputError('Claude 执行器目前只支持 Anthropic 原生连接；GPT 等跨协议连接尚未接入');};
  const isBuiltin=id=>['dsh','opencode'].includes(id);
  const factoryFor=id=>id==='dsh'?dshFactory:engineFactory;
  const checking=new Map(),nativeLogins=new Map();
@@ -68,7 +72,8 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
    if(part.type==='reasoning'){executionPhase(task,'thinking');changed();}
    if(part.type==='text'){selectPart(raw.part.id);draft(String(raw.part.text||''));}
    if(part.type==='tool'){toolActivity(task,part);if(!active.get(task.id)?.harness2)recordTool(task,part);const status=part.state?.status||'';const text=(part.tool||'工具')+' · '+status;const last=task.events.at(-1);if(last?.partID===part.id){last.text=text;last.detail=JSON.stringify(part.state?.input||{}).slice(0,4000);changed();}else addEvent(task,{type:'tool',partID:part.id,text,detail:JSON.stringify(part.state?.input||{}).slice(0,4000)});}
-  }else if(event.type==='gfot.activity'){executionPhase(task,properties.phase,properties.detail);changed();}
+  }else if(event.type==='gfot.subagent'){addEvent(task,{type:'subagent',text:properties.text+' · '+(properties.agentId||''),detail:properties.detail});}
+  else if(event.type==='gfot.activity'){executionPhase(task,properties.phase,properties.detail);changed();}
   else if(event.type==='gfot.output.boundary'){boundary();changed();}
   else if(event.type==='message.part.delta'&&properties.field==='reasoning'){executionPhase(task,'thinking');changed();}
   else if(event.type==='message.part.delta'&&properties.field==='text'){selectPart(raw.partID);draft((active.get(task.id)?.rawDraft||'')+String(raw.delta||''));}
@@ -86,14 +91,14 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
    const saved=slots[agent.id]||(agent.kind==='builtin'&&task.sessionId&&!Object.keys(slots).length?{sessionId:task.sessionId,cursor:task.messages.length-1}:{});
    const engineTask=task;engineTask.sessionId=saved.sessionId||null;
    const wasFresh=!engineTask.sessionId;
-   if(agent.kind==='builtin')grant=grantProfile(profile);runtime.proxyKey=grant?.key;
+   if(usesConnection(agent))grant=grantProfile(profile);runtime.proxyKey=grant?.key;
    const resolved=grant?{...profile,baseURL:grant.baseURL,protocol:grant.protocol}:profile;
-   const engine=runtime.engine=agent.kind==='builtin'?factoryFor(agent.id)({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event,runtime)}):agent.kind==='doubao'?doubaoFactory({root:doubaoRoot,task:engineTask,onEvent:event=>onEvent(task,event,runtime),onSession:sessionId=>{task.sessionId=sessionId;slots[agent.id]={sessionId,cursor:saved.cursor||0};storage.save();}}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event,runtime)});
+   const engine=runtime.engine=agent.kind==='claude'?claudeFactory({binary:agent.binary,dataDir,task:engineTask,profile:resolved,key:grant.key,systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event,runtime)}):agent.kind==='builtin'?factoryFor(agent.id)({binary,dataDir,task:engineTask,profile:resolved,key:grant?.key||secrets.open(profile.secret),systemPrompt:task.adoptedHarness?harnessPrompt(task.adoptedHarness.tree):undefined,onEvent:event=>onEvent(task,event,runtime)}):agent.kind==='doubao'?doubaoFactory({root:doubaoRoot,task:engineTask,onEvent:event=>onEvent(task,event,runtime),onSession:sessionId=>{task.sessionId=sessionId;slots[agent.id]={sessionId,cursor:saved.cursor||0};storage.save();}}):acpFactory({launch:agents.command(agent.id),task:engineTask,onEvent:event=>onEvent(task,event,runtime)});
    await engine.start();
    slots[agent.id]={sessionId:engineTask.sessionId,cursor:wasFresh||engine.resumed===false?0:saved.cursor||0};
    task.sessionId=engineTask.sessionId;storage.save();if(runtime.cancelled)return;
    const packet=sharedContext(task,state.projects.find(p=>p.id===task.projectId),state.tasks,{detailed:true}),shared=packet.text;
-   const adopted=agent.kind!=='builtin'&&task.adoptedHarness?'Task instructions explicitly adopted by the user:\n'+harnessPrompt(task.adoptedHarness.tree)+'\n\n':'';
+   const adopted=!usesConnection(agent)&&task.adoptedHarness?'Task instructions explicitly adopted by the user:\n'+harnessPrompt(task.adoptedHarness.tree)+'\n\n':'';
    const transfer=continuationText(task,text,{fresh:wasFresh||engine.resumed===false,cursor:saved.cursor||0,includeNotes:false,maxChars:Math.max(0,60000-shared.length-adopted.length-text.length-700)});
    const outgoing=adopted+shared+'\n'+transfer.text;
    if(outgoing.length>60000)throw new InputError('共享记忆、执行指令与本条消息超过上下文预算，请缩短项目或任务记忆后继续。');
@@ -153,7 +158,8 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
  }
  async function switchTask(task,input){
   const agent=agents.get(input.agentId),profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));
-  if(input.resume===true&&agent.kind==='builtin'){
+  if(input.resume===true||agent.kind==='claude')validateProfile(agent,profile);
+  if(input.resume===true&&usesConnection(agent)){
    if(!profile||!profile.model)throw new InputError('请先选择内置执行器的模型与账号连接');
    if(profile.mode==='account'){const account=accounts.find(profile.accountId);if(!account.secret)throw new InputError('目标账号已退出，请先登录或导入');if(account.status==='reauth-required'||(!account.canRefresh&&account.expiresAt<=Date.now()))throw new InputError('目标账号凭证不可用，请重新登录或导入');}
    else if(profile.mode==='direct'&&!profile.secret)throw new InputError('目标连接缺少 API Key');
@@ -171,6 +177,7 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
    if(nativeTurnPending(task))throw new InputError('原生 Agent 上一轮尚未确认结束，请先核对并确认，暂不能交接给其他 Agent');
    task.checkpoint=checkpoint(task,await workspaceObserver(task.folder));
    if(closed)throw new InputError('服务正在关闭');
+   if(usesConnection(agent)&&profile)task.profileId=profile.id;
    task.agentId=agent.id;task.executorKind=agent.kind;task.sessionId=task.agentSessions?.[agent.id]?.sessionId||null;
    task.switchHistory=[...(task.switchHistory||[]),{from,to:agent.id,checkpointId:task.checkpoint.id,at:new Date().toISOString(),continued:input.resume===true}].slice(-20);
    delete task.transition;storage.save();addEvent(task,{type:'handoff',text:'已交接给 '+agent.name+'，保留原项目、任务和执行进度。'});
@@ -205,6 +212,12 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
    const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>100000)return send(413,{error:'内容过大'});chunks.push(chunk);}
    if(closed)return send(503,{error:'服务正在关闭'});
    let input;try{input=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new InputError('JSON 格式无效');}if(!input||typeof input!=='object'||Array.isArray(input))throw new InputError('需要对象');
+   if(path==='/api/runtimes/claude/candidates')return send(200,{paths:[...new Set([state.runtimes?.claude?.path,...claudeCandidates()].filter(Boolean))]});
+   if(path==='/api/runtimes/claude/select'){
+    if(!bearer)return send(403,{error:'请通过桌面文件选择器设置执行文件'});
+    if(active.size||switches.size||checking.size)throw new InputError('请先结束执行再更换运行时');
+    const runtime=await inspectClaudeRuntime(input.path);if(active.size||switches.size||checking.size)throw new InputError('版本检查期间开始了任务，请结束执行后重试');state.runtimes||={};state.runtimes.claude=runtime;agents.refresh();storage.save();changed();return send(200,view());
+   }
    if(path==='/api/agents/refresh'){agents.refresh();changed();return send(200,view());}
    if(path==='/api/agents/login/start'){
     if(!bearer)return send(403,{error:'请通过桌面客户端启动登录'});
@@ -222,7 +235,7 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
     const login=nativeLogins.get(input.id);if(!login)throw new InputError('登录不存在');login.public.status='cancelled';login.public.note='登录已取消';await login.engine.stop();changed();return send(200,{ok:true});
    }
    if(path==='/api/agents/check'){
-    const agent=agents.get(input.id);if(!['acp','doubao'].includes(agent.kind))throw new InputError('此 Agent 无需执行接口检查');
+    const agent=agents.get(input.id);if(agent.kind==='claude'){await inspectClaudeRuntime(agent.binary);return send(200,{ok:true,note:'Claude Code 版本检查通过，未调用模型。'});}if(!['acp','doubao'].includes(agent.kind))throw new InputError('此 Agent 无需执行接口检查');
     if(checking.has(agent.id)||active.size||switches.size)throw new InputError('请等待执行或检查结束');
     checking.set(agent.id,null);const folder=mkdtempSync(join(tmpdir(),'gfot-agent-check-'));let engine;
     try{engine=agent.kind==='doubao'?doubaoFactory({root:doubaoRoot,task:{folder,sessionId:null},readOnly:true}):acpFactory({launch:agents.command(agent.id),task:{folder,sessionId:null},readOnly:true});checking.set(agent.id,engine);await engine.start();
@@ -296,7 +309,7 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
    if(path==='/api/tasks'){
     let folder;try{folder=realpathSync(requireText(input.folder,'项目目录',4096));if(!statSync(folder).isDirectory())throw Error();}catch{throw new InputError('项目目录不存在或不可访问');}
     const agent=agents.get(input.agentId||defaultAgentId);if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');
-    if(agent.requiresProfile!==false&&agent.kind==='builtin'&&!state.profiles.some(p=>p.id===input.profileId))throw new InputError('请先配置并选择模型连接');
+    validateProfile(agent,state.profiles.find(p=>p.id===input.profileId));
     const task=newTask(input,folder);task.projectId=ensureProject(state,folder).id;task.agentId=agent.id;task.agentSessions={};task.contextNotes='';state.tasks.unshift(task);storage.save();changed();return send(200,{taskId:task.id});
    }
    const match=path.match(/^\/api\/tasks\/([^/]+)\/(prompt|stop|permission|question|harness|harness-adopt|harness-clear|agent|switch|confirm-stopped|notes)$/);if(!match)return send(404,{error:'未找到该操作'});
@@ -324,12 +337,13 @@ export async function startDesktopServer({dataDir,binary,key,dshRoot,nodeBinary,
    }
    if(match[2]==='prompt'){
     if(runtime)throw new InputError('本轮尚未结束');if(task.executionUnconfirmed)throw new InputError('请先核对并确认上一轮原生任务结束');if([...nativeLogins.values()].some(l=>l.public.status==='pending'))throw new InputError('请先完成或取消 Agent 登录');if(occupiedSlots()>=2)throw new InputError('首版最多同时执行两个任务');
-    const text=requireText(input.text,'任务内容');const agent=agents.get(task.agentId||'opencode');if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');const profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));if(agent.kind==='builtin'&&!profile)throw new InputError('请选择可用的连接');
+    const text=requireText(input.text,'任务内容');const agent=agents.get(task.agentId||'opencode');if(agent.kind==='unavailable')throw new InputError('此应用尚未提供客户端内执行接口');const profile=state.profiles.find(p=>p.id===(input.profileId||task.profileId));validateProfile(agent,profile);
     launch(task,text,profile,agent);return send(202,{started:true});
    }
    if(match[2]==='stop'){if(runtime){runtime.cancelled=true;executionPhase(task,'stopping');changed();void runtime.engine?.stop().catch(error=>{task.error=safe(error.message);changed();});}return send(200,{stopping:!!runtime});}
    if(!runtime)throw new InputError('执行已结束');const pending=task.pending.find(p=>p.id===input.id);if(!pending)throw new InputError('请求已失效');
    if(match[2]==='permission'){if(pending.kind!=='permission'||!['once','reject'].includes(input.reply))throw new InputError('请选择批准一次或拒绝');await runtime.engine.permission(input.id,input.reply);}
+   else if(input.cancel===true){if(pending.kind!=='question'||!pending.canCancel)throw new InputError('此问题不支持单独取消');await runtime.engine.question(input.id,null);}
    else{if(pending.kind!=='question'||!Array.isArray(input.answers)||!input.answers.every(a=>Array.isArray(a)&&a.every(s=>typeof s==='string')))throw new InputError('请回答问题');await runtime.engine.question(input.id,input.answers);}
    task.pending=task.pending.filter(p=>p.id!==input.id);task.status=task.pending.length?'permission':'running';if(task.execution?.phase==='permission')executionPhase(task,task.pending.length?'permission':'waiting');changed();return send(200,{ok:true});
   }catch(error){send(error instanceof InputError?400:500,{error:error instanceof InputError?error.message:'操作失败：请检查连接和执行器状态'});}

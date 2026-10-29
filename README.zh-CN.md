@@ -29,6 +29,7 @@ gfot 用于管理本地项目中的 AI 编程任务，将项目目录、任务�
 
 - **围绕项目组织任务。** 选择本地目录，按任务保存对话与执行记录。
 - **运行本机 Agent。** 默认由内置 DeepSeek Harness（dsh）执行。保留 OpenCode 以继续已有任务，也可通过 ACP 调用已安装的 OpenCode、WorkBuddy、WorkBuddy AI CLI。豆包桌面端提供实验性原生接入。本机执行器使用各自的登录与额度。
+- **使用 Claude Agent。** 选择兼容的本机 Claude Code 与 Anthropic API 连接，在 gfot 中审批工具、回答反问并恢复原生会话。参见[配置与支持版本](docs/claude-integration.md)。
 - **使用自己的账号。** 为 dsh 接入已有 Codex 登录、API、本机模型服务或兼容代理；在回合之间切换模型或账号，保留同一个 dsh 会话。在“账号与额度”中查看凭证状态及已支持的用量窗口。
 - **切换 Agent，继续原任务。** 保留项目目录与对话，交接项目记忆、工具结果和工作区状态；遇到额度限制可选择其他执行器继续。
 - **看清执行过程。** 实时查看思考状态、工具活动和授权请求；过程更新默认收起，回答支持标题、列表和代码复制。
@@ -72,6 +73,7 @@ cd gfot
 npm ci
 node node_modules/electron/install.js
 npm run runtime:dsh
+npm run runtime:claude
 npm run desktop
 ```
 
@@ -95,6 +97,7 @@ npm run dist:mac
 | --- | --- |
 | **gfot · Electron / Node.js** | 桌面界面、任务持久化、账号管理、本地代理与审批处理。 |
 | **DeepSeek Harness · dsh** | 默认执行循环、原生工具、会话和子 Agent，通过 stdio JSON-RPC 接入 gfot 的审批与反问。 |
+| **Claude Agent SDK · 本机 Claude Code** | 可选的原生执行循环、工具与会话；由 gfot 接管审批并隔离配置。 |
 | **其他执行适配层 · HTTP / ACP** | 保留已有 OpenCode 会话，并接入本机 Agent CLI。 |
 | **Harness² · Python 适配层** | 可选的任务级指令配置探测、提案与合成流程。 |
 
@@ -104,7 +107,7 @@ npm run dist:mac
 
 ## 文档
 
-[dsh 执行引擎](docs/dsh-integration.md) · [本地 Agent](docs/local-agents.md) · [桌面版指南](docs/desktop-preview.md) · [账号与代理](docs/accounts.md) · [模型来源与路由](docs/model-routing.md) · [Harness² 接入](docs/h2-integration.md) · [验证记录](docs/verification.md)
+[dsh 执行引擎](docs/dsh-integration.md) · [Claude Agent](docs/claude-integration.md) · [本地 Agent](docs/local-agents.md) · [桌面版指南](docs/desktop-preview.md) · [账号与代理](docs/accounts.md) · [模型来源与路由](docs/model-routing.md) · [Harness² 接入](docs/h2-integration.md) · [验证记录](docs/verification.md)
 
 ## 参与贡献
 

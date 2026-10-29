@@ -16,5 +16,10 @@ jobs:
           python-version: '3.12'
       - run: npm ci --ignore-scripts --omit=optional
       - run: npm ci --prefix desktop/runtime/dsh --ignore-scripts --no-audit --no-fund
+      - run: npm run runtime:claude
+      - name: Prepare synthetic-service Claude runtime tests
+        run: |
+          npm install --prefix "$RUNNER_TEMP/gfot-claude-runtime" --ignore-scripts --no-audit --no-fund --save-exact @anthropic-ai/claude-agent-sdk-linux-x64@0.3.312
+          echo "GFOT_TEST_CLAUDE_BIN=$RUNNER_TEMP/gfot-claude-runtime/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude" >> "$GITHUB_ENV"
       - run: npm run check
       - run: npm test
