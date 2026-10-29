@@ -1,8 +1,10 @@
 # 让 gfot 中的 Claude Code 使用 OpenAI 兼容模型服务
 
-状态：待实现；本地 Issue，尚未发布到 GitHub。
+状态：待实现；GitHub Issue 已发布。
+GitHub：[#3](https://github.com/Wayneway26/gfot/issues/3)。
+本地记录：006。
 优先级：P2。
-阻塞依赖：本地 Issue 004「在 gfot 内使用 Claude Code 完成带审批的本地项目任务」。不依赖 005，可并行推进。
+阻塞依赖：GitHub Issue [#1](https://github.com/Wayneway26/gfot/issues/1)「在 gfot 内使用 Claude Code 完成带审批的本地项目任务」。不依赖 005，可并行推进。
 基线：h2 / 26e51fd。
 
 ## 要解决的问题

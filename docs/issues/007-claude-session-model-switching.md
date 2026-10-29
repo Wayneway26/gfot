@@ -1,8 +1,10 @@
 # 在同一 Claude 任务中切换账号和模型并继续执行
 
-状态：待实现；本地 Issue，尚未发布到 GitHub。
+状态：待实现；GitHub Issue 已发布。
+GitHub：[#4](https://github.com/Wayneway26/gfot/issues/4)。
+本地记录：007。
 优先级：P1。
-阻塞依赖：本地 Issue 005「让 gfot 中的 Claude Code 使用 Codex 账号调用 GPT」。兼容 API 连接随 006 完成后纳入，不阻塞本条首轮验收。
+阻塞依赖：GitHub Issue [#2](https://github.com/Wayneway26/gfot/issues/2)「让 gfot 中的 Claude Code 使用 Codex 账号调用 GPT」。兼容 API 连接随 006 完成后纳入，不阻塞本条首轮验收。
 基线：h2 / 26e51fd。
 
 ## 要解决的问题

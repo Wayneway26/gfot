@@ -1,8 +1,10 @@
 # 让 gfot 中的 Claude Code 使用 Codex 账号调用 GPT
 
-状态：待实现；本地 Issue，尚未发布到 GitHub。
+状态：待实现；GitHub Issue 已发布。
+GitHub：[#2](https://github.com/Wayneway26/gfot/issues/2)。
+本地记录：005。
 优先级：P1。
-阻塞依赖：本地 Issue 004「在 gfot 内使用 Claude Code 完成带审批的本地项目任务」。
+阻塞依赖：GitHub Issue [#1](https://github.com/Wayneway26/gfot/issues/1)「在 gfot 内使用 Claude Code 完成带审批的本地项目任务」。
 基线：h2 / 26e51fd。
 
 ## 要解决的问题

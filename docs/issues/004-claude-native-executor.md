@@ -1,6 +1,8 @@
 # 在 gfot 内使用 Claude Code 完成带审批的本地项目任务
 
-状态：待实现；本地 Issue，尚未发布到 GitHub。
+状态：待实现；GitHub Issue 已发布。
+GitHub：[#1](https://github.com/Wayneway26/gfot/issues/1)。
+本地记录：004。
 优先级：P1。
 阻塞依赖：无，可立即开始。
 基线：h2 / 26e51fd。
@@ -29,7 +31,7 @@
 
 ## 范围
 
-本条先完成 Anthropic 原生协议的完整执行链路。跨协议的 GPT/其他模型接入分别由本地 Issue 005、006 完成。SDK 的嵌入接口不等于取得 Claude Code 核心代码的开源授权；构建物的依赖、许可和分发方式必须准确记录。
+本条先完成 Anthropic 原生协议的完整执行链路。跨协议的 GPT/其他模型接入分别由GitHub Issue [#2](https://github.com/Wayneway26/gfot/issues/2)、006 完成。SDK 的嵌入接口不等于取得 Claude Code 核心代码的开源授权；构建物的依赖、许可和分发方式必须准确记录。
 
 ## 参考
 
